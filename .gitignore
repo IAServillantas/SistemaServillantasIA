@@ -1,0 +1,27 @@
+# Exportaciones empresariales y entregables derivados
+*.xlsx
+*.xls
+*.csv
+resultados/
+
+# Datos de inventario generados para el dashboard
+dashboard/data.js
+
+# Evidencias visuales que pueden mostrar datos operativos
+dashboard/verificacion*.png
+distribucion/verificacion*.png
+
+# Paquetes de distribucion generados (se reconstruyen desde el codigo fuente)
+distribucion/*.zip
+
+# Instrucciones operativas internas
+AGENTS.md
+
+# Archivos locales del sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+*.tmp
+

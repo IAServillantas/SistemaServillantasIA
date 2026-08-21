@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control de inventario</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">OPERACIONES</p>
+      <h1>Control de inventario</h1>
+    </div>
+    <div class="cutoff"><span>Fecha de corte</span><strong id="cutoffDate">--</strong></div>
+  </header>
+
+  <main>
+    <section class="source-panel" aria-labelledby="sourceTitle">
+      <div>
+        <p class="eyebrow">FUENTE LOCAL</p>
+        <h2 id="sourceTitle">Inventario cargado</h2>
+        <p id="sourceStatus" class="source-status">Datos incluidos en el paquete</p>
+      </div>
+      <div class="source-actions">
+        <label class="file-button" for="excelInput">Cargar Excel</label>
+        <input id="excelInput" type="file" accept=".xlsx,.xlsm,.xlsb,.xls" hidden>
+        <button id="restoreDataButton" type="button">Usar datos incluidos</button>
+      </div>
+      <p id="sourceError" class="source-error" role="alert" hidden></p>
+    </section>
+
+    <section class="toolbar" aria-label="Filtros">
+      <label class="search-field">
+        <span>Buscar</span>
+        <input id="searchInput" type="search" placeholder="SKU, descripcion, medida o marca">
+      </label>
+      <label><span>Sucursal</span><select id="branchFilter"><option value="TOTAL">Inventario compartido</option><option value="SAT">Satelite</option><option value="INS">Insurgentes</option><option value="CUE">Cuesta</option><option value="TOR">Torres</option></select></label>
+      <label><span>Tier</span><select id="tierFilter"><option value="ALL">Todos</option><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option><option value="4">Tier 4</option></select></label>
+      <label><span>Accion</span><select id="statusFilter"><option value="ALL">Todas</option><option value="REPONER">Reponer</option><option value="REDUCIR">Reducir</option><option value="OBSERVAR">Observar</option><option value="SALUDABLE">Saludable</option></select></label>
+      <button id="resetButton" type="button">Limpiar filtros</button>
+    </section>
+
+    <section class="kpi-grid" aria-label="Indicadores principales">
+      <article class="kpi"><span>Unidades disponibles</span><strong id="kpiUnits">--</strong><small id="kpiSku">-- SKU</small></article>
+      <article class="kpi"><span>Capital en inventario</span><strong id="kpiCapital">--</strong><small>A ultimo costo</small></article>
+      <article class="kpi critical"><span>Quiebres</span><strong id="kpiStockouts">--</strong><small>Con demanda estimada</small></article>
+      <article class="kpi warning"><span>Exceso</span><strong id="kpiExcess">--</strong><small>Mas de 120 dias</small></article>
+      <article class="kpi muted"><span>Sin movimiento</span><strong id="kpiStale">--</strong><small>90 dias o mas</small></article>
+    </section>
+
+    <section class="status-guide" aria-labelledby="statusGuideTitle">
+      <div class="guide-heading">
+        <p class="eyebrow">CRITERIOS</p>
+        <h2 id="statusGuideTitle">Significado de los estados</h2>
+      </div>
+      <div class="guide-grid action-guide">
+        <div><span class="status status-REPONER">Reponer</span><p>Requiere recuperar disponibilidad. Incluye quiebres y coberturas menores al objetivo de 105 dias.</p></div>
+        <div><span class="status status-REDUCIR">Reducir</span><p>Conviene disminuir inventario mediante venta, promocion o transferencia. Incluye exceso y falta de movimiento.</p></div>
+        <div><span class="status status-OBSERVAR">Observar</span><p>No debe tomarse una accion definitiva todavia. Se aplica a compras realizadas durante los ultimos 30 dias.</p></div>
+        <div><span class="status status-SALUDABLE">Saludable</span><p>La disponibilidad no activa ningun criterio de reposicion, reduccion u observacion.</p></div>
+      </div>
+      <div class="criteria-rules">
+        <h3>Reglas de los criterios</h3>
+        <dl>
+          <div><dt>Quiebre</dt><dd>Existencia disponible igual a cero y demanda estimada mayor que cero.</dd></div>
+          <div><dt>Cobertura insuficiente</dt><dd>La existencia disponible no cubre 105 dias: 90 dias objetivo mas 15 dias de colchon. La compra sugerida es la diferencia.</dd></div>
+          <div><dt>Exceso</dt><dd>Mas de 120 dias de cobertura y ultima compra realizada hace mas de 30 dias.</dd></div>
+          <div><dt>Sin movimiento</dt><dd>Existencia disponible positiva y 90 dias o mas desde la ultima venta registrada.</dd></div>
+          <div><dt>Compra reciente</dt><dd>Mas de 120 dias de cobertura, pero la ultima compra fue hace 30 dias o menos. Se espera antes de clasificar como exceso.</dd></div>
+          <div><dt>Inventario anterior a 2023</dt><dd>Una fecha de compra vacia significa que el articulo ya existia antes de la migracion de base de datos de 2023. Si supera 120 dias de cobertura se clasifica como Reducir.</dd></div>
+        </dl>
+      </div>
+      <p class="guide-note">La demanda mensual pondera el trimestre reciente al doble que el trimestre anterior. La existencia disponible es la suma de Satelite, Insurgentes, Cuesta y Torres; no incluye llantas apartadas.</p>
+    </section>
+
+    <section class="overview-grid">
+      <div class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">CAPACIDAD</p><h2>Inventario de llantas por sucursal</h2></div></div>
+        <div id="capacityChart" class="capacity-chart"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">DISTRIBUCION</p><h2>Unidades por tier</h2></div></div>
+        <div id="tierChart" class="tier-chart"></div>
+      </div>
+    </section>
+
+    <section class="measure-section">
+      <div class="table-heading">
+        <div>
+          <p class="eyebrow">PRIORIDAD POR MEDIDA</p>
+          <h2>Medidas que requieren mayor atencion</h2>
+          <p id="measureSummary" class="subtle"></p>
+        </div>
+      </div>
+      <div class="measure-rule">
+        <strong>Orden de prioridad:</strong> tiers faltantes con demanda, cobertura menor a 105 dias, cobertura mayor a 120 dias, 90 dias sin movimiento y compras recientes en observacion. La ubicacion entre sucursales no afecta el resultado.
+      </div>
+      <div class="measure-filters">
+        <label><span>Buscar medida</span><input id="measureSearch" type="search" placeholder="Ej. 205/55R16"></label>
+        <label><span>Prioridad</span><select id="measurePriority"><option value="ATTENTION">Requieren atencion</option><option value="CRITICA">Critica</option><option value="REPONER">Reponer</option><option value="REDUCIR">Reducir</option><option value="SIN_MOVIMIENTO">Sin movimiento</option><option value="OBSERVAR">Observar</option><option value="SALUDABLE">Saludable</option><option value="ALL">Todas</option></select></label>
+        <label><span>Tier faltante</span><select id="missingTier"><option value="ALL">Cualquiera</option><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option><option value="4">Tier 4</option><option value="NONE">Ninguno</option></select></label>
+        <label><span>Compra sugerida</span><select id="measurePurchase"><option value="ALL">Todas</option><option value="YES">Con compra</option><option value="NO">Sin compra</option></select></label>
+      </div>
+      <div class="table-wrap measure-table-wrap">
+        <table>
+          <thead><tr><th>Prioridad</th><th>Motivo</th><th>Medida</th><th>Tiers disponibles</th><th>Tiers faltantes</th><th class="number">Disponible</th><th class="number">Apartadas</th><th class="number">Venta 6M</th><th class="number">Cobertura</th><th class="number">Compra sugerida</th><th class="number">Capital</th></tr></thead>
+          <tbody id="measureBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination"><button id="prevMeasurePage" type="button" aria-label="Pagina anterior de medidas">Anterior</button><span id="measurePageLabel"></span><button id="nextMeasurePage" type="button" aria-label="Pagina siguiente de medidas">Siguiente</button></div>
+    </section>
+
+    <section class="table-section">
+      <div class="table-heading">
+        <div><p class="eyebrow">DETALLE</p><h2>Articulos que requieren atencion</h2><p id="resultCount" class="subtle"></p></div>
+        <button id="exportButton" type="button">Exportar CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Accion</th><th>Motivo</th><th>SKU</th><th>Descripcion</th><th>Medida</th><th>Marca</th><th>Tier</th><th class="number">Disponible</th><th class="number">Apartadas</th><th class="number">Cobertura</th><th>Ultima compra</th><th class="number">Dias desde compra</th><th class="number">Venta 6M</th><th class="number">Compra sugerida</th><th class="number">Capital disponible</th></tr></thead>
+          <tbody id="inventoryBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination"><button id="prevPage" type="button" aria-label="Pagina anterior">Anterior</button><span id="pageLabel"></span><button id="nextPage" type="button" aria-label="Pagina siguiente">Siguiente</button></div>
+    </section>
+  </main>
+
+  <footer><span>Fuente: Inventarios al 20 de agosto.xlsx | Clasificacion: PLT</span><span>Las recomendaciones requieren validacion operativa.</span></footer>
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+DASHBOARD LOCAL DE INVENTARIO
+
+1. Extraiga toda la carpeta antes de usarla.
+2. Ejecute "Abrir dashboard.cmd" o abra "index.html" con Chrome o Edge.
+3. Presione "Cargar Excel".
+4. Seleccione un archivo que contenga la hoja Consulta1 y las columnas esperadas.
+5. El archivo se procesa dentro del navegador y no se envia a internet.
+
+El dashboard conserva la ultima carga en el navegador de esa computadora.
+Para cambiar de periodo, vuelva a presionar "Cargar Excel" y seleccione el nuevo archivo.
+
+La opcion "Usar datos incluidos" deja el dashboard vacio en esta copia distribuible.
+No elimine ni cambie de lugar los archivos de la carpeta vendor.
