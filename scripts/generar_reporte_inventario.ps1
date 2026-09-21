@@ -250,7 +250,7 @@ $summary = @(
 $methodology = @(
     [pscustomobject]@{ Tema = "Demanda"; Regla = "Promedio mensual ponderado de seis bloques de 30 dias; pesos 1 a 6, con mayor peso al periodo reciente." }
     [pscustomobject]@{ Tema = "Estacionalidad"; Regla = "Indice mensual calculado con meses completos de ventas; limitado entre 0.75 y 1.25 para evitar distorsiones." }
-    [pscustomobject]@{ Tema = "Compra sugerida"; Regla = "Demanda diaria ponderada por 90 dias mas 15 dias de colchon, ajustada por temporada, menos inventario compartido." }
+    [pscustomobject]@{ Tema = "Compra sugerida"; Regla = "Demanda diaria ponderada por 90 dias, ajustada por temporada, menos inventario compartido." }
     [pscustomobject]@{ Tema = "Exceso"; Regla = "Inventario superior a 120 dias de demanda estimada." }
     [pscustomobject]@{ Tema = "Sin movimiento"; Regla = "Inventario positivo y 90 dias o mas sin venta registrada." }
     [pscustomobject]@{ Tema = "Quiebre"; Regla = "Inventario compartido igual a cero y demanda ponderada mayor que cero." }

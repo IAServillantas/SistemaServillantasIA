@@ -1,0 +1,20 @@
+DASHBOARD LOCAL - SERVILLANTAS DE CHIHUAHUA
+
+1. Extraiga toda la carpeta antes de usarla.
+2. Ejecute "Abrir dashboard.cmd" o abra "index.html" con Chrome o Edge.
+3. Presione "Cargar Excel".
+4. Seleccione una exportacion con la hoja Consulta1 y las columnas esperadas.
+5. El archivo se procesa localmente en el navegador y no se envia a internet.
+
+UNIDADES OPERATIVAS
+
+- Chihuahua consolidado: FCO + PIS + JUV + CAMP.
+- Parral: PAR.
+- La venta de Chihuahua es ACUM_VTS_3M menos ACUM_VTS_PAR.
+- La venta de Parral es ACUM_VTS_PAR.
+- El objetivo de inventario es 90 dias.
+- Las unidades apartadas no cuentan como existencia disponible.
+
+La ultima carga se conserva solamente en el navegador de esa computadora.
+La opcion "Usar datos incluidos" deja el dashboard vacio en esta copia distribuible.
+No elimine ni cambie de lugar los archivos de la carpeta vendor.

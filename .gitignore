@@ -25,3 +25,19 @@ Thumbs.db
 *.log
 *.tmp
 
+
+# Perfiles temporales de navegador
+.chrome-debug*/
+.edge-test/
+GIT/
+GIT/
+
+# Respaldos locales
+archive/
+
+# Datos generados de dashboards
+**/data.js
+
+# Evidencias y diagnosticos
+**/diagnostico_*.png
+**/verificacion*.png

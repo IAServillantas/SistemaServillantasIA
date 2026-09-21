@@ -55,19 +55,20 @@
         <h2 id="statusGuideTitle">Significado de los estados</h2>
       </div>
       <div class="guide-grid action-guide">
-        <div><span class="status status-REPONER">Reponer</span><p>Requiere recuperar disponibilidad. Incluye quiebres y coberturas menores al objetivo de 105 dias.</p></div>
+        <div><span class="status status-REPONER">Reponer</span><p>Requiere recuperar disponibilidad. Incluye quiebres y coberturas menores al objetivo de 90 dias.</p></div>
         <div><span class="status status-REDUCIR">Reducir</span><p>Conviene disminuir inventario mediante venta, promocion o transferencia. Incluye exceso y falta de movimiento.</p></div>
-        <div><span class="status status-OBSERVAR">Observar</span><p>No debe tomarse una accion definitiva todavia. Se aplica a compras realizadas durante los ultimos 30 dias.</p></div>
+        <div><span class="status status-OBSERVAR">Observar</span><p>No debe tomarse una accion definitiva todavia. Se aplica a compras realizadas durante los ultimos 90 dias.</p></div>
         <div><span class="status status-SALUDABLE">Saludable</span><p>La disponibilidad no activa ningun criterio de reposicion, reduccion u observacion.</p></div>
       </div>
       <div class="criteria-rules">
         <h3>Reglas de los criterios</h3>
         <dl>
           <div><dt>Quiebre</dt><dd>Existencia disponible igual a cero y demanda estimada mayor que cero.</dd></div>
-          <div><dt>Cobertura insuficiente</dt><dd>La existencia disponible no cubre 105 dias: 90 dias objetivo mas 15 dias de colchon. La compra sugerida es la diferencia.</dd></div>
-          <div><dt>Exceso</dt><dd>Mas de 120 dias de cobertura y ultima compra realizada hace mas de 30 dias.</dd></div>
+          <div><dt>Cobertura insuficiente</dt><dd>La existencia disponible no cubre el objetivo de 90 dias. La compra sugerida es la diferencia necesaria para alcanzar ese nivel.</dd></div>
+          <div><dt>Exceso</dt><dd>Mas de 120 dias de cobertura y ultima compra realizada hace mas de 90 dias.</dd></div>
           <div><dt>Sin movimiento</dt><dd>Existencia disponible positiva y 90 dias o mas desde la ultima venta registrada.</dd></div>
-          <div><dt>Compra reciente</dt><dd>Mas de 120 dias de cobertura, pero la ultima compra fue hace 30 dias o menos. Se espera antes de clasificar como exceso.</dd></div>
+          <div><dt>Compra reciente</dt><dd>La ultima compra fue hace 90 dias o menos. Aunque todavia no tenga ventas o aparente exceso, se mantiene en observacion antes de clasificarla como reducir.</dd></div>
+          <div><dt>Sin oferta</dt><dd>La combinacion medida-tier no tiene ningun SKU registrado. Se muestra como referencia, sin estimar demanda ni sugerir una accion.</dd></div>
           <div><dt>Inventario anterior a 2023</dt><dd>Una fecha de compra vacia significa que el articulo ya existia antes de la migracion de base de datos de 2023. Si supera 120 dias de cobertura se clasifica como Reducir.</dd></div>
         </dl>
       </div>
@@ -86,25 +87,30 @@
     </section>
 
     <section class="measure-section">
+      <div class="measure-tabs" role="tablist" aria-label="Vista de medidas">
+        <button id="generalMeasureTab" class="measure-tab active" type="button" role="tab" aria-selected="true">Analisis general</button>
+        <button id="criticalMeasureTab" class="measure-tab" type="button" role="tab" aria-selected="false">Sin inventario</button>
+      </div>
       <div class="table-heading">
         <div>
           <p class="eyebrow">PRIORIDAD POR MEDIDA</p>
-          <h2>Medidas que requieren mayor atencion</h2>
+          <h2 id="measureTitle">Cobertura por medida y tier</h2>
           <p id="measureSummary" class="subtle"></p>
         </div>
+        <button id="exportMeasuresButton" type="button">Exportar medidas a Excel</button>
       </div>
-      <div class="measure-rule">
-        <strong>Orden de prioridad:</strong> tiers faltantes con demanda, cobertura menor a 105 dias, cobertura mayor a 120 dias, 90 dias sin movimiento y compras recientes en observacion. La ubicacion entre sucursales no afecta el resultado.
+      <div id="measureRule" class="measure-rule">
+        <strong>Unidad de decision:</strong> cada celda agrupa todos los SKU de una medida y tier. La compra sugerida cubre 90 dias de demanda del grupo; no se suma una compra por cada codigo. La ubicacion entre sucursales no afecta el resultado.
       </div>
       <div class="measure-filters">
         <label><span>Buscar medida</span><input id="measureSearch" type="search" placeholder="Ej. 205/55R16"></label>
-        <label><span>Prioridad</span><select id="measurePriority"><option value="ATTENTION">Requieren atencion</option><option value="CRITICA">Critica</option><option value="REPONER">Reponer</option><option value="REDUCIR">Reducir</option><option value="SIN_MOVIMIENTO">Sin movimiento</option><option value="OBSERVAR">Observar</option><option value="SALUDABLE">Saludable</option><option value="ALL">Todas</option></select></label>
-        <label><span>Tier faltante</span><select id="missingTier"><option value="ALL">Cualquiera</option><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option><option value="4">Tier 4</option><option value="NONE">Ninguno</option></select></label>
+        <label><span>Accion del grupo</span><select id="measurePriority"><option value="ATTENTION">Requieren atencion</option><option value="REPONER">Reponer</option><option value="REDUCIR">Reducir</option><option value="OBSERVAR">Observar</option><option value="SALUDABLE">Adecuado</option><option value="ALL">Todas</option></select></label>
+        <label><span>Tier</span><select id="missingTier"><option value="ALL">Todos</option><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option><option value="4">Tier 4</option></select></label>
         <label><span>Compra sugerida</span><select id="measurePurchase"><option value="ALL">Todas</option><option value="YES">Con compra</option><option value="NO">Sin compra</option></select></label>
       </div>
       <div class="table-wrap measure-table-wrap">
         <table>
-          <thead><tr><th>Prioridad</th><th>Motivo</th><th>Medida</th><th>Tiers disponibles</th><th>Tiers faltantes</th><th class="number">Disponible</th><th class="number">Apartadas</th><th class="number">Venta 6M</th><th class="number">Cobertura</th><th class="number">Compra sugerida</th><th class="number">Capital</th></tr></thead>
+          <thead><tr><th>Medida</th><th>Tier 1</th><th>Tier 2</th><th>Tier 3</th><th>Tier 4</th><th class="number">Venta total 6M</th><th class="number">Disponible total</th></tr></thead>
           <tbody id="measureBody"></tbody>
         </table>
       </div>
@@ -118,7 +124,7 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Accion</th><th>Motivo</th><th>SKU</th><th>Descripcion</th><th>Medida</th><th>Marca</th><th>Tier</th><th class="number">Disponible</th><th class="number">Apartadas</th><th class="number">Cobertura</th><th>Ultima compra</th><th class="number">Dias desde compra</th><th class="number">Venta 6M</th><th class="number">Compra sugerida</th><th class="number">Capital disponible</th></tr></thead>
+          <thead><tr><th>Accion</th><th>Motivo</th><th>SKU</th><th>Descripcion</th><th>Medida</th><th>Marca</th><th>Tier</th><th class="number">Disponible</th><th class="number">Apartadas</th><th class="number">Cobertura</th><th>Ultima compra</th><th class="number">Dias desde compra</th><th class="number">Venta 6M</th><th class="number">Capital disponible</th></tr></thead>
           <tbody id="inventoryBody"></tbody>
         </table>
       </div>

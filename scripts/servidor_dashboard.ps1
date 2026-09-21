@@ -16,6 +16,7 @@ try {
         $reader = $null
         try {
             $stream = $client.GetStream()
+            $stream.ReadTimeout = 2000
             $reader = [IO.StreamReader]::new($stream, [Text.Encoding]::ASCII, $false, 4096, $true)
             $requestLine = $reader.ReadLine()
             while ($reader.ReadLine()) { }

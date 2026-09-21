@@ -7,9 +7,14 @@ $ErrorActionPreference = "Stop"
 Set-ExecutionPolicy -Scope Process Bypass -Force
 $module = Get-Module -ListAvailable ImportExcel | Sort-Object Version -Descending | Select-Object -First 1
 if ($null -eq $module) {
-    throw "No se encontro el modulo ImportExcel."
+    $fallback = "C:\Users\Luis T. Acosta\OneDrive\Documentos\WindowsPowerShell\Modules\ImportExcel\7.8.10\ImportExcel.psd1"
+    if (-not (Test-Path -LiteralPath $fallback)) {
+        throw "No se encontro el modulo ImportExcel."
+    }
+    Import-Module $fallback
+} else {
+    Import-Module $module.Path
 }
-Import-Module $module.Path
 
 function Number($value) {
     if ($null -eq $value -or $value -eq "") { return 0.0 }
@@ -39,7 +44,7 @@ $output = foreach ($row in $rows) {
     $monthlyDemand = ((2 * $recentMonthly) + $priorMonthly) / 3.0
     $dailyDemand = $monthlyDemand / 30.0
     $coverage = if ($dailyDemand -gt 0) { [math]::Round($exist / $dailyDemand, 0) } else { $null }
-    $purchase = [math]::Max(0, [math]::Ceiling(($dailyDemand * 105) - $exist))
+    $purchase = [math]::Max(0, [math]::Ceiling(($dailyDemand * 90) - $exist))
     $lastSale = Excel-Date $row.FCH_ULTVTA
     $daysWithoutSale = if ($lastSale) { ($cutoff - $lastSale.Date).Days } else { 9999 }
     $lastPurchase = Excel-Date $row.FCH_ULTCOM
@@ -63,7 +68,7 @@ $output = foreach ($row in $rows) {
         exist = [int]$exist
         reserved = [int]$reserved
         cost = [math]::Round((Number $row.ULT_COSTO), 2)
-        price = [math]::Round((Number $row.'Precio publico'), 2)
+        price = [math]::Round((Number $row.'Precio público'), 2)
         sales3 = [math]::Round($sales3, 2)
         sales6 = [math]::Round($sales6, 2)
         monthlyDemand = [math]::Round($monthlyDemand, 2)
