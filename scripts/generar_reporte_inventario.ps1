@@ -167,7 +167,7 @@ foreach ($item in $inventory) {
         MargenEstimado = [math]::Round($margin, 4)
         CompraSugerida = [int]$purchase
         InversionSugerida = [math]::Round($purchase * $cost, 2)
-        AdvertenciaDemanda = if ($stock -le 0 -and $daysWithoutSale -ge $rules.report.lostDemandWarningDays) { "Posiblemente subestimada: agotado o sin venta por 60 dias o mas" } else { "Sin alerta" }
+        AdvertenciaDemanda = if ($stock -le 0 -and $daysWithoutSale -ge $rules.report.lostDemandWarningDays) { "Posiblemente subestimada: agotado o sin venta por $($rules.report.lostDemandWarningDays) dias o mas" } else { "Sin alerta" }
     })
 }
 
@@ -217,7 +217,7 @@ foreach ($row in $analysis) {
                     Origen = $best.Origin
                     Destino = $destination
                     TransferenciaSugerida = [int]$quantity
-                    Evidencia = "Destino sin inventario y con ventas en los ultimos 90 dias"
+                    Evidencia = "Destino sin inventario y con ventas en los ultimos $(($referenceDate - $start90).Days + 1) dias"
                     Confianza = "Media; validar pedidos en transito y costo de traslado"
                 })
             }
@@ -243,23 +243,23 @@ $quality = @(
 $summary = @(
     [pscustomobject]@{ Indicador = "Fecha de corte detectada"; Valor = $referenceDate.ToString("dd/MM/yyyy"); Interpretacion = "Fecha maxima en ventas por articulo" }
     [pscustomobject]@{ Indicador = "SKU de llantas analizados"; Valor = $analysis.Count; Interpretacion = "Catalogo con medida y tier valido" }
-    [pscustomobject]@{ Indicador = "SKU con compra sugerida"; Valor = $purchases.Count; Interpretacion = "Objetivo de $forecastDays dias ajustado por temporada" }
+    [pscustomobject]@{ Indicador = "SKU con compra sugerida"; Valor = $purchases.Count; Interpretacion = "Objetivo de $forecastDays dias ($DiasCoberturaObjetivo dias de cobertura + $DiasColchon dias de colchon) ajustado por temporada" }
     [pscustomobject]@{ Indicador = "Inversion total sugerida"; Valor = "{0:C0}" -f (($purchases | Measure-Object InversionSugerida -Sum).Sum); Interpretacion = "Validar disponibilidad y tiempo de entrega" }
-    [pscustomobject]@{ Indicador = "SKU sin movimiento"; Valor = $noMovement.Count; Interpretacion = "Con inventario y 90 dias o mas sin venta" }
-    [pscustomobject]@{ Indicador = "SKU con exceso"; Valor = $excess.Count; Interpretacion = "Mas de 120 dias de cobertura" }
+    [pscustomobject]@{ Indicador = "SKU sin movimiento"; Valor = $noMovement.Count; Interpretacion = "Con inventario y $($rules.inventory.noMovementDays) dias o mas sin venta" }
+    [pscustomobject]@{ Indicador = "SKU con exceso"; Valor = $excess.Count; Interpretacion = "Mas de $($rules.inventory.excessDays) dias de cobertura" }
     [pscustomobject]@{ Indicador = "SKU en quiebre"; Valor = $stockouts.Count; Interpretacion = "Sin inventario compartido y con demanda estimada" }
     [pscustomobject]@{ Indicador = "Transferencias candidatas"; Valor = $transfers.Count; Interpretacion = "Requieren validacion operativa" }
 )
 
 $methodology = @(
     [pscustomobject]@{ Tema = "Demanda"; Regla = "Promedio mensual ponderado de seis bloques de 30 dias; pesos 1 a 6, con mayor peso al periodo reciente." }
-    [pscustomobject]@{ Tema = "Estacionalidad"; Regla = "Indice mensual calculado con meses completos de ventas; limitado entre 0.75 y 1.25 para evitar distorsiones." }
-    [pscustomobject]@{ Tema = "Compra sugerida"; Regla = "Demanda diaria ponderada por 90 dias, ajustada por temporada, menos inventario compartido." }
-    [pscustomobject]@{ Tema = "Exceso"; Regla = "Inventario superior a 120 dias de demanda estimada." }
-    [pscustomobject]@{ Tema = "Sin movimiento"; Regla = "Inventario positivo y 90 dias o mas sin venta registrada." }
+    [pscustomobject]@{ Tema = "Estacionalidad"; Regla = "Indice mensual calculado con meses completos de ventas; limitado entre $($rules.report.seasonFactorMin.ToString([Globalization.CultureInfo]::InvariantCulture)) y $($rules.report.seasonFactorMax.ToString([Globalization.CultureInfo]::InvariantCulture)) para evitar distorsiones." }
+    [pscustomobject]@{ Tema = "Compra sugerida"; Regla = "Demanda diaria ponderada por $forecastDays dias ($DiasCoberturaObjetivo dias de cobertura + $DiasColchon dias de colchon), ajustada por temporada, menos inventario compartido." }
+    [pscustomobject]@{ Tema = "Exceso"; Regla = "Inventario superior a $($rules.inventory.excessDays) dias de demanda estimada." }
+    [pscustomobject]@{ Tema = "Sin movimiento"; Regla = "Inventario positivo y $($rules.inventory.noMovementDays) dias o mas sin venta registrada." }
     [pscustomobject]@{ Tema = "Quiebre"; Regla = "Inventario compartido igual a cero y demanda ponderada mayor que cero." }
     [pscustomobject]@{ Tema = "Limitacion"; Regla = "No se recibieron pedidos en transito, historial diario de existencias, tiempos de entrega por SKU ni costos de traslado; validar antes de ejecutar compras o transferencias." }
-    [pscustomobject]@{ Tema = "Agotados por 60 dias"; Regla = "Sin historial diario de existencias no es posible reconstruir la demanda perdida; estos casos se marcan como posiblemente subestimados." }
+    [pscustomobject]@{ Tema = "Agotados por $($rules.report.lostDemandWarningDays) dias"; Regla = "Sin historial diario de existencias no es posible reconstruir la demanda perdida; estos casos se marcan como posiblemente subestimados." }
     [pscustomobject]@{ Tema = "Privacidad"; Regla = "No se utilizaron ni exportaron nombres de clientes." }
 )
 

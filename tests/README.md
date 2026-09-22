@@ -1,4 +1,4 @@
-﻿# Pruebas y operacion de Fase 1
+# Pruebas y operacion de Fase 1
 
 Requisitos de desarrollo: Git con el commit de referencia b83e6f3, PowerShell 5.1, ImportExcel (probado con 7.8.10) y Node.js 22 o superior. Node solo se necesita para pruebas, no para abrir los dashboards.
 
@@ -13,6 +13,7 @@ Antes de modificar produccion pasaron 32 pruebas JavaScript y 15 comprobaciones 
 
 - `node tests/Test-Inventory-Contract.cjs`: 14 pruebas del nuevo contrato, caches antiguos y configuracion generada.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File tests/Test-Inventory.ps1 -Contract`: 38 comprobaciones del contrato y de los generadores/reporte con archivos Excel sinteticos reales. Valida que las diferencias de EXIST no excluyen filas y que se conservan demanda, compra y columnas exportadas.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File tests/Test-Report-Texts.ps1`: 21 comprobaciones de textos del Excel con umbrales modificados en una copia temporal del JSON y parametros explicitos de cobertura/colchon; no modifica la configuracion del repositorio.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File tests/Test-Server.ps1`: cinco recursos HTTP, incluido shared, con servidor temporal. Cierra exclusivamente el proceso que crea.
 
 Los Excel sinteticos y resultados se crean en una carpeta temporal unica que se informa al terminar. No se usan datos operativos. El harness JavaScript no es una prueba visual de navegador.
@@ -39,6 +40,6 @@ Una diferencia negativa superior a 0.01 unidades genera `SYSTEM_STOCK_BELOW_AVAI
 
 Un cache antiguo no conserva EXIST original, especialmente cuando la diferencia era negativa: `systemStock` y `stockDifference` quedan en null y se agrega `LEGACY_SYSTEM_STOCK_UNKNOWN`, sin inventar valores. `availableStock`/`reservedStock` se recuperan de los aliases. Una nueva carga Excel recupera el contrato completo.
 
-Se conservan las tres estrategias de demanda: ponderacion trimestral general, ventas trimestrales por CHIH/PAR y seis bloques ponderados con estacionalidad y colchon en el reporte. Se conserva la etiqueta historica `Inventario anterior a 2023` cuando falta fecha; caracterizarla no valida esa inferencia. La fecha fija del generador general, textos visibles y nombres de exportacion se mantienen por alcance de fase; no editar umbrales esperando que se reescriban esos textos automaticamente.
+Se conservan las tres estrategias de demanda: ponderacion trimestral general, ventas trimestrales por CHIH/PAR y seis bloques ponderados con estacionalidad y colchon en el reporte. Se conserva la etiqueta historica `Inventario anterior a 2023` cuando falta fecha; caracterizarla no valida esa inferencia. La fecha fija del generador general, los textos visibles de los dashboards y los nombres de exportacion se mantienen por alcance de fase. Los textos generados del reporte PowerShell reflejan los umbrales configurados y los parametros efectivos de cobertura y colchon; la ventana historica de transferencias se describe a partir de las fechas efectivamente utilizadas.
 
-La unica variacion del contenido del reporte es la inclusion de filas antes descartadas y sus efectos en totales/compras/transferencias, junto con el diagnostico de apartados/diferencia negativa. Se mantienen nombres de hojas y columnas.
+Las variaciones del contenido del reporte incluyen los textos de configuracion efectiva y la inclusion de filas antes descartadas y sus efectos en totales/compras/transferencias, junto con el diagnostico de apartados/diferencia negativa. Se mantienen nombres de hojas y columnas.
