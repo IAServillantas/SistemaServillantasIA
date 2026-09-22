@@ -23,8 +23,14 @@ try {
             $requestPath = if ($requestLine -match '^GET\s+([^\s]+)') { $matches[1].Split('?')[0] } else { "/" }
             $relative = [Uri]::UnescapeDataString($requestPath).TrimStart('/')
             if ([string]::IsNullOrWhiteSpace($relative)) { $relative = "index.html" }
-            $candidate = [IO.Path]::GetFullPath((Join-Path $resolvedRoot $relative))
-            if (-not $candidate.StartsWith($resolvedRoot, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            # Shared source scripts are also available when serving a dashboard as the root.
+            $assetRoot = $resolvedRoot
+            if ($relative.StartsWith('shared/') -and -not (Test-Path -LiteralPath (Join-Path $resolvedRoot 'shared'))) {
+                $assetRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../shared'))
+                $relative = $relative.Substring('shared/'.Length)
+            }
+            $candidate = [IO.Path]::GetFullPath((Join-Path $assetRoot $relative))
+            if (-not $candidate.StartsWith(($assetRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar), [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
                 $status = "404 Not Found"
                 $contentType = "text/plain; charset=utf-8"
                 $bytes = [Text.Encoding]::UTF8.GetBytes("No encontrado")

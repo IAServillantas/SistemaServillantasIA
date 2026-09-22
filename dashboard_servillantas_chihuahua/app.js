@@ -1,14 +1,15 @@
 (() => {
-  const bundledSource = window.INVENTORY_DATA || { cutoff: "", rows: [] };
-  const TARGET_COVERAGE_DAYS = 90;
-  const RECENT_PURCHASE_DAYS = 90;
+  const bundledSource = Inventory.upgrade(window.INVENTORY_DATA || { cutoff: "", rows: [] });
+  const RULES = window.INVENTORY_RULES;
+  const TARGET_COVERAGE_DAYS = RULES.inventory.targetCoverageDays;
+  const RECENT_PURCHASE_DAYS = RULES.inventory.recentPurchaseDays;
   const DATA_VERSION = "servillantas-plt-cvt-v1";
   let source = bundledSource;
   try {
     const stored = localStorage.getItem("inventoryDashboardDataServillantasChihuahua");
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (parsed.dataVersion === DATA_VERSION) source = parsed;
+      if (parsed.dataVersion === DATA_VERSION) source = Inventory.upgrade(parsed);
     }
   } catch (_) { }
   const state = { page: 1, pageSize: 50, rows: [], measurePage: 1, measurePageSize: 25, measureView: "GENERAL", suppliers: { general: null, t53: null }, supplierResults: [], homologationPreview: [] };
@@ -90,7 +91,7 @@
       const measure = normalizeMeasure(measureSource);
       const stock = asNumber(row[(kind === "general" ? 10 : 17) - 1]);
       const rawCost = asNumber(row[(kind === "general" ? 17 : 13) - 1]);
-      const cost = kind === "general" ? rawCost / 1.16 : rawCost;
+      const cost = kind === "general" ? rawCost / RULES.suppliers.generalCostDivisor : rawCost;
       if (!measure) { excludedMeasure++; return; }
       if (!(stock > 0)) { excludedStock++; return; }
       if (!(cost > 0)) { excludedCost++; return; }
@@ -163,19 +164,19 @@
     const offersByMeasure = new Map();
     [...state.suppliers.general.offers, ...state.suppliers.t53.offers].forEach((offer) => { if (!offersByMeasure.has(offer.measure)) offersByMeasure.set(offer.measure, []); offersByMeasure.get(offer.measure).push(offer); });
     state.supplierResults = [...groups.values()].map((group) => {
-      const replenishmentNeed = Math.max(0, Math.ceil(group.sales3 - group.stock));
+      const replenishmentNeed = Math.max(0, Math.ceil((group.sales3 * (TARGET_COVERAGE_DAYS / 90)) - group.stock));
       const offers = (offersByMeasure.get(group.measure) || []).sort((a, b) => a.cost - b.cost || b.stock - a.stock);
       const latestCost = group.datedCosts.sort((a, b) => a.age - b.age)[0]?.cost || null;
       const fallbackCost = group.costUnits > 0 ? group.costCapital / group.costUnits : (group.costs.length ? group.costs.reduce((sum, cost) => sum + cost, 0) / group.costs.length : null);
       const ownCost = latestCost || fallbackCost;
       const bestOffer = offers[0] || null;
       const savingsRate = bestOffer && ownCost > 0 ? (ownCost - bestOffer.cost) / ownCost : null;
-      const opportunity = group.sales3 > 0 && savingsRate !== null && savingsRate >= 0.10 && group.stock < (group.sales3 * 4 / 3);
-      const need = opportunity ? Math.max(0, Math.ceil((group.sales3 * 4 / 3) - group.stock)) : replenishmentNeed;
+      const opportunity = group.sales3 > 0 && savingsRate !== null && savingsRate >= RULES.suppliers.minimumSavingsRate && group.stock < (group.sales3 * (RULES.suppliers.opportunityCoverageDays / 30) / 3);
+      const need = opportunity ? Math.max(0, Math.ceil((group.sales3 * (RULES.suppliers.opportunityCoverageDays / 30) / 3) - group.stock)) : replenishmentNeed;
       const recommendation = opportunity ? (replenishmentNeed > 0 ? "Reposicion + oportunidad" : "Oportunidad") : "Reposicion";
       let remaining = need; let allocated = 0;
       const allocations = offers.map((offer) => {
-        const meetsOpportunitySaving = ownCost > 0 && offer.cost <= ownCost * 0.90;
+        const meetsOpportunitySaving = ownCost > 0 && offer.cost <= ownCost * (1 - RULES.suppliers.minimumSavingsRate);
         const allowed = opportunity && !meetsOpportunitySaving ? Math.max(0, replenishmentNeed - allocated) : remaining;
         const quantity = Math.min(remaining, allowed, offer.stock); remaining -= quantity; allocated += quantity;
         return { ...offer, quantity, meetsOpportunitySaving };
@@ -202,7 +203,7 @@
   }
 
   function exportSupplierRecommendations() {
-    const output = state.supplierResults.flatMap((row) => row.allocations.length ? row.allocations.map((offer, index) => { const savingsUnit = row.ownCost ? row.ownCost - offer.cost : null; return { Unidad: $("branchFilter").value === "PAR" ? "Parral" : "Chihuahua consolidado", Clasificacion: "PLT", Tier: 4, Medida: row.measure, Recomendacion: row.recommendation, Venta_3M: row.sales3, Inventario_propio: row.stock, Reposicion_90_dias: row.replenishmentNeed, Cantidad_objetivo: row.need, Cobertura_maxima_dias: row.opportunity ? 120 : 90, Prioridad_oferta: index + 1, Proveedor: offer.provider, SKU_proveedor: offer.sku, Disponible_proveedor: offer.stock, Costo_proveedor: offer.cost, Ultimo_costo_propio: row.ownCost ? Math.round(row.ownCost * 100) / 100 : "", Ahorro_unitario: savingsUnit === null ? "" : Math.round(savingsUnit * 100) / 100, Ahorro_porcentaje: savingsUnit === null ? "" : Math.round((savingsUnit / row.ownCost) * 10000) / 100, Ahorro_estimado: savingsUnit === null ? "" : Math.round(savingsUnit * offer.quantity * 100) / 100, Compra_sugerida: offer.quantity, Pendiente_total: row.pending }; }) : [{ Unidad: $("branchFilter").value === "PAR" ? "Parral" : "Chihuahua consolidado", Clasificacion: "PLT", Tier: 4, Medida: row.measure, Recomendacion: row.recommendation, Venta_3M: row.sales3, Inventario_propio: row.stock, Reposicion_90_dias: row.replenishmentNeed, Cantidad_objetivo: row.need, Proveedor: "Sin oferta", Compra_sugerida: 0, Pendiente_total: row.pending }]);
+    const output = state.supplierResults.flatMap((row) => row.allocations.length ? row.allocations.map((offer, index) => { const savingsUnit = row.ownCost ? row.ownCost - offer.cost : null; return { Unidad: $("branchFilter").value === "PAR" ? "Parral" : "Chihuahua consolidado", Clasificacion: "PLT", Tier: 4, Medida: row.measure, Recomendacion: row.recommendation, Venta_3M: row.sales3, Inventario_propio: row.stock, Reposicion_90_dias: row.replenishmentNeed, Cantidad_objetivo: row.need, Cobertura_maxima_dias: row.opportunity ? RULES.suppliers.opportunityCoverageDays : TARGET_COVERAGE_DAYS, Prioridad_oferta: index + 1, Proveedor: offer.provider, SKU_proveedor: offer.sku, Disponible_proveedor: offer.stock, Costo_proveedor: offer.cost, Ultimo_costo_propio: row.ownCost ? Math.round(row.ownCost * 100) / 100 : "", Ahorro_unitario: savingsUnit === null ? "" : Math.round(savingsUnit * 100) / 100, Ahorro_porcentaje: savingsUnit === null ? "" : Math.round((savingsUnit / row.ownCost) * 10000) / 100, Ahorro_estimado: savingsUnit === null ? "" : Math.round(savingsUnit * offer.quantity * 100) / 100, Compra_sugerida: offer.quantity, Pendiente_total: row.pending }; }) : [{ Unidad: $("branchFilter").value === "PAR" ? "Parral" : "Chihuahua consolidado", Clasificacion: "PLT", Tier: 4, Medida: row.measure, Recomendacion: row.recommendation, Venta_3M: row.sales3, Inventario_propio: row.stock, Reposicion_90_dias: row.replenishmentNeed, Cantidad_objetivo: row.need, Proveedor: "Sin oferta", Compra_sugerida: 0, Pendiente_total: row.pending }]);
     const sheet = XLSX.utils.json_to_sheet(output); sheet["!cols"] = [22, 13, 7, 14, 12, 18, 18, 15, 20, 20, 21, 18, 26, 18, 18, 16].map((wch) => ({ wch }));
     const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, sheet, "Recomendacion de compra");
     XLSX.writeFile(workbook, `servillantas_${$("branchFilter").value.toLowerCase()}_compra_tier4_${(source.cutoff || "sin_fecha").replaceAll("/", "-")}.xlsx`);
@@ -238,8 +239,9 @@
     const rows = sourceRows.map((row) => {
       const fco = asNumber(row.FCO); const pis = asNumber(row.PIS); const juv = asNumber(row.JUV); const par = asNumber(row.PAR); const camp = asNumber(row.CAMP);
       const chih = fco + pis + juv + camp;
-      const exist = chih + par;
-      const reserved = Math.max(0, asNumber(row.EXIST) - exist);
+      const stock = Inventory.calculate(asNumber(row.EXIST), [fco, pis, juv, par, camp]);
+      const exist = stock.availableStock;
+      const reserved = stock.reservedStock;
       const sales3 = asNumber(row.ACUM_VTS_3M);
       const sales3Par = Math.max(0, asNumber(row.ACUM_VTS_PAR));
       const sales3Chih = Math.max(0, sales3 - sales3Par);
@@ -248,6 +250,7 @@
       const tier = Math.trunc(asNumber(row.TIER));
       const control = String(row.CTRL_ALM || "").trim().toUpperCase();
       return {
+        ...stock,
         sku: String(row.CVE_ART || ""), description: String(row.DESCRIPCION || row.DESCR || ""), line: String(row.LIN_PROD || ""), control,
         measure: String(row.MEDIDA || ""), brand: String(row.MARCA || ""), tier, type: control,
         fco: Math.trunc(fco), pis: Math.trunc(pis), juv: Math.trunc(juv), par: Math.trunc(par), camp: Math.trunc(camp), chih: Math.trunc(chih), exist: Math.trunc(exist), reserved: Math.trunc(reserved),
@@ -312,12 +315,12 @@
     if (stock <= 0 && monthlyDemand > 0) return { status: "REPONER", criterion: "Quiebre" };
     if (purchase > 0) return { status: "REPONER", criterion: "Cobertura insuficiente" };
     if (stock > 0 && monthlyDemand <= 0 && row.daysSincePurchase !== null && row.daysSincePurchase <= RECENT_PURCHASE_DAYS) return { status: "OBSERVAR", criterion: "Compra reciente sin ventas" };
-    if (coverage !== null && coverage > 120 && stock > 0) {
+    if (coverage !== null && coverage > RULES.inventory.excessDays && stock > 0) {
       if (row.daysSincePurchase === null) return { status: "REDUCIR", criterion: "Inventario anterior a 2023" };
       if (row.daysSincePurchase <= RECENT_PURCHASE_DAYS) return { status: "OBSERVAR", criterion: "Compra reciente" };
       return { status: "REDUCIR", criterion: "Exceso" };
     }
-    if (row.daysWithoutSale >= 90 && stock > 0) return { status: "REDUCIR", criterion: "Sin movimiento" };
+    if (row.daysWithoutSale >= RULES.inventory.noMovementDays && stock > 0) return { status: "REDUCIR", criterion: "Sin movimiento" };
     return { status: "SALUDABLE", criterion: "Sin alerta" };
   };
   const activeStatus = (row, branch) => evaluate(row, branch).status;
@@ -354,7 +357,7 @@
   }
 
   function renderCapacity() {
-    const limits = { fco: null, pis: null, juv: null, camp: null, par: null };
+    const limits = RULES.chihuahua.capacity;
     const labels = { fco: "Fco. Villa", pis: "Pistolas", juv: "Juventud", camp: "Campesina", par: "Parral" };
     const type = $("typeFilter").value;
     const tires = source.rows.filter((row) => row.control === type);
@@ -405,8 +408,8 @@
         if (exist <= 0 && monthlyDemand > 0) { action = "REPONER"; criterion = "Quiebre"; rank = 1; }
         else if (coverage !== null && coverage < TARGET_COVERAGE_DAYS) { action = "REPONER"; criterion = "Cobertura insuficiente"; rank = 2; }
         else if (monthlyDemand <= 0 && lastPurchaseAge !== null && lastPurchaseAge <= RECENT_PURCHASE_DAYS) { action = "OBSERVAR"; criterion = "Compra reciente sin ventas"; rank = 4; }
-        else if (coverage !== null && coverage > 120 && lastPurchaseAge !== null && lastPurchaseAge <= RECENT_PURCHASE_DAYS) { action = "OBSERVAR"; criterion = "Compra reciente"; rank = 4; }
-        else if (coverage !== null && coverage > 120) { action = "REDUCIR"; criterion = lastPurchaseAge === null ? "Inventario anterior a 2023" : "Exceso"; rank = 3; }
+        else if (coverage !== null && coverage > RULES.inventory.excessDays && lastPurchaseAge !== null && lastPurchaseAge <= RECENT_PURCHASE_DAYS) { action = "OBSERVAR"; criterion = "Compra reciente"; rank = 4; }
+        else if (coverage !== null && coverage > RULES.inventory.excessDays) { action = "REDUCIR"; criterion = lastPurchaseAge === null ? "Inventario anterior a 2023" : "Exceso"; rank = 3; }
         else if (monthlyDemand <= 0) { action = "OBSERVAR"; criterion = "Sin demanda estimada"; rank = 5; }
         const rankedSkus = [...rows].sort((a, b) => branchSales3(b, branch) - branchSales3(a, branch) || ((b.price > 0 ? (b.price - b.cost) / b.price : 0) - (a.price > 0 ? (a.price - a.cost) / a.price : 0)) || a.cost - b.cost);
         return { measure: measure.measure, tier, rows, skuCount: rows.length, exist, reserved, sales3, monthlyDemand, coverage, purchase, capital: rows.reduce((sum, row) => sum + branchStock(row, branch) * row.cost, 0), action, criterion, rank, primary: rankedSkus[0]?.sku || "Seleccionar SKU", alternatives: rankedSkus.slice(1, 3).map((row) => row.sku) };
