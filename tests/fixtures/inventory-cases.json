@@ -1,0 +1,15 @@
+{
+  "statuses": [
+    {"name":"quiebre","stock":0,"sales3":30,"sales6":60,"purchaseAge":150,"saleAge":0,"criterion":"Quiebre"},
+    {"name":"cobertura insuficiente","stock":10,"sales3":30,"sales6":60,"purchaseAge":150,"saleAge":0,"criterion":"Cobertura insuficiente"},
+    {"name":"exceso","stock":50,"sales3":30,"sales6":60,"purchaseAge":150,"saleAge":0,"criterion":"Exceso"},
+    {"name":"compra reciente","stock":50,"sales3":30,"sales6":60,"purchaseAge":20,"saleAge":0,"criterion":"Compra reciente"},
+    {"name":"sin movimiento","stock":10,"sales3":0,"sales6":0,"purchaseAge":150,"saleAge":100,"criterion":"Sin movimiento"},
+    {"name":"fecha desconocida","stock":50,"sales3":30,"sales6":60,"purchaseAge":null,"saleAge":0,"criterion":"Inventario anterior a 2023"}
+  ],
+  "stock": [
+    {"name":"igual","systemStock":18,"warehouses":[10,8,0,0],"availableStock":18,"reservedStock":0,"diagnostics":[]},
+    {"name":"apartado","systemStock":25,"warehouses":[10,8,0,0],"availableStock":18,"reservedStock":7,"diagnostics":[]},
+    {"name":"diferencia negativa","systemStock":12,"warehouses":[10,8,0,0],"availableStock":18,"reservedStock":0,"diagnostics":["SYSTEM_STOCK_BELOW_AVAILABLE"]}
+  ]
+}

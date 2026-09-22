@@ -5,16 +5,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-ExecutionPolicy -Scope Process Bypass -Force
-$module = Get-Module -ListAvailable ImportExcel | Sort-Object Version -Descending | Select-Object -First 1
-if ($null -eq $module) {
-    $fallback = "C:\Users\Luis T. Acosta\OneDrive\Documentos\WindowsPowerShell\Modules\ImportExcel\7.8.10\ImportExcel.psd1"
-    if (-not (Test-Path -LiteralPath $fallback)) {
-        throw "No se encontro el modulo ImportExcel."
-    }
-    Import-Module $fallback
-} else {
-    Import-Module $module.Path
-}
+Import-Module (Join-Path $PSScriptRoot "Inventory.Common.psm1") -Force
+Import-InventoryExcel
+$rules = Get-InventoryRules
 
 function Number($value) {
     if ($null -eq $value -or $value -eq "") { return 0.0 }
@@ -35,8 +28,9 @@ $output = foreach ($row in $rows) {
     $sat = Number $row.SAT; $ins = Number $row.INS; $cue = Number $row.CUE; $tor = Number $row.TOR
     $sumBranches = $sat + $ins + $cue + $tor
     $systemExist = Number $row.EXIST
-    $exist = $sumBranches
-    $reserved = [math]::Max(0, $systemExist - $sumBranches)
+    $stockContract = Get-InventoryStock -SystemStock $systemExist -Warehouses @($sat, $ins, $cue, $tor)
+    $exist = $stockContract.availableStock
+    $reserved = $stockContract.reservedStock
     $sales3 = Number $row.ACUM_VTS_3M
     $sales6 = Number $row.'ACUM_VTS_6M.SUM'
     $recentMonthly = $sales3 / 3.0
@@ -44,7 +38,7 @@ $output = foreach ($row in $rows) {
     $monthlyDemand = ((2 * $recentMonthly) + $priorMonthly) / 3.0
     $dailyDemand = $monthlyDemand / 30.0
     $coverage = if ($dailyDemand -gt 0) { [math]::Round($exist / $dailyDemand, 0) } else { $null }
-    $purchase = [math]::Max(0, [math]::Ceiling(($dailyDemand * 90) - $exist))
+    $purchase = [math]::Max(0, [math]::Ceiling(($dailyDemand * $rules.inventory.targetCoverageDays) - $exist))
     $lastSale = Excel-Date $row.FCH_ULTVTA
     $daysWithoutSale = if ($lastSale) { ($cutoff - $lastSale.Date).Days } else { 9999 }
     $lastPurchase = Excel-Date $row.FCH_ULTCOM
@@ -53,6 +47,11 @@ $output = foreach ($row in $rows) {
     $measure = [string]$row.MEDIDA
     $type = if (-not [string]::IsNullOrWhiteSpace($measure) -and $tier -ge 1 -and $tier -le 4) { "LLANTA" } else { "OTRO" }
     [ordered]@{
+        systemStock = $stockContract.systemStock
+        availableStock = $stockContract.availableStock
+        reservedStock = $stockContract.reservedStock
+        stockDifference = $stockContract.stockDifference
+        stockDiagnostics = @($stockContract.stockDiagnostics)
         sku = $sku
         description = [string]$row.DESCRIPCION
         line = [string]$row.LIN_PROD

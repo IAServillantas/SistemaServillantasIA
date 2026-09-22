@@ -1,7 +1,8 @@
 (() => {
-  const bundledSource = window.INVENTORY_DATA || { cutoff: "", rows: [] };
-  const TARGET_COVERAGE_DAYS = 90;
-  const RECENT_PURCHASE_DAYS = 90;
+  const bundledSource = Inventory.upgrade(window.INVENTORY_DATA || { cutoff: "", rows: [] });
+  const RULES = window.INVENTORY_RULES;
+  const TARGET_COVERAGE_DAYS = RULES.inventory.targetCoverageDays;
+  const RECENT_PURCHASE_DAYS = RULES.inventory.recentPurchaseDays;
   function applyCurrentPurchaseTarget(data) {
     if (!data || !Array.isArray(data.rows)) return data;
     return { ...data, rows: data.rows.map((row) => ({
@@ -12,7 +13,7 @@
   let source = bundledSource;
   try {
     const stored = localStorage.getItem("inventoryDashboardData");
-    if (stored) source = JSON.parse(stored);
+    if (stored) source = Inventory.upgrade(JSON.parse(stored));
   } catch (_) { }
   source = applyCurrentPurchaseTarget(source);
   const state = { page: 1, pageSize: 50, rows: [], measurePage: 1, measurePageSize: 25 };
@@ -80,8 +81,9 @@
 
     const rows = sourceRows.map((row) => {
       const sat = asNumber(row.SAT); const ins = asNumber(row.INS); const cue = asNumber(row.CUE); const tor = asNumber(row.TOR);
-      const exist = sat + ins + cue + tor;
-      const reserved = Math.max(0, asNumber(row.EXIST) - exist);
+      const stock = Inventory.calculate(asNumber(row.EXIST), [sat, ins, cue, tor]);
+      const exist = stock.availableStock;
+      const reserved = stock.reservedStock;
       const sales3 = asNumber(row.ACUM_VTS_3M);
       const sales6 = asNumber(row["ACUM_VTS_6M.SUM"]);
       const recentMonthly = sales3 / 3;
@@ -94,6 +96,7 @@
       const lastPurchase = asDate(row.FCH_ULTCOM);
       const tier = Math.trunc(asNumber(row.TIER));
       return {
+        ...stock,
         sku: String(row.CVE_ART || ""), description: String(row.DESCRIPCION || row.DESCR || ""), line: String(row.LIN_PROD || ""), control: "PLT",
         measure: String(row.MEDIDA || ""), brand: String(row.MARCA || ""), tier, type: "LLANTA",
         sat: Math.trunc(sat), ins: Math.trunc(ins), cue: Math.trunc(cue), tor: Math.trunc(tor), exist: Math.trunc(exist), reserved: Math.trunc(reserved),
@@ -146,12 +149,12 @@
     if (stock <= 0 && row.monthlyDemand > 0) return { status: "REPONER", criterion: "Quiebre" };
     if (row.purchase > 0) return { status: "REPONER", criterion: "Cobertura insuficiente" };
     if (stock > 0 && row.monthlyDemand <= 0 && row.daysSincePurchase !== null && row.daysSincePurchase <= RECENT_PURCHASE_DAYS) return { status: "OBSERVAR", criterion: "Compra reciente sin ventas" };
-    if (row.coverage !== null && row.coverage > 120 && stock > 0) {
+    if (row.coverage !== null && row.coverage > RULES.inventory.excessDays && stock > 0) {
       if (row.daysSincePurchase === null) return { status: "REDUCIR", criterion: "Inventario anterior a 2023" };
       if (row.daysSincePurchase <= RECENT_PURCHASE_DAYS) return { status: "OBSERVAR", criterion: "Compra reciente" };
       return { status: "REDUCIR", criterion: "Exceso" };
     }
-    if (row.daysWithoutSale >= 90 && stock > 0) return { status: "REDUCIR", criterion: "Sin movimiento" };
+    if (row.daysWithoutSale >= RULES.inventory.noMovementDays && stock > 0) return { status: "REDUCIR", criterion: "Sin movimiento" };
     return { status: "SALUDABLE", criterion: "Sin alerta" };
   };
   const activeStatus = (row, branch) => evaluate(row, branch).status;
@@ -186,7 +189,7 @@
   }
 
   function renderCapacity() {
-    const limits = { sat: 1000, ins: null, cue: 300, tor: 300 };
+    const limits = RULES.general.capacity;
     const labels = { sat: "Satelite", ins: "Insurgentes", cue: "Cuesta", tor: "Torres" };
     const tires = source.rows.filter((row) => row.type === "LLANTA");
     const totals = Object.keys(limits).map((key) => ({ key, value: tires.reduce((sum, row) => sum + row[key], 0), limit: limits[key] }));
@@ -233,8 +236,8 @@
         if (exist <= 0 && monthlyDemand > 0) { action = "REPONER"; criterion = "Quiebre"; rank = 1; }
         else if (coverage !== null && coverage < TARGET_COVERAGE_DAYS) { action = "REPONER"; criterion = "Cobertura insuficiente"; rank = 2; }
         else if (monthlyDemand <= 0 && lastPurchaseAge !== null && lastPurchaseAge <= RECENT_PURCHASE_DAYS) { action = "OBSERVAR"; criterion = "Compra reciente sin ventas"; rank = 4; }
-        else if (coverage !== null && coverage > 120 && lastPurchaseAge !== null && lastPurchaseAge <= RECENT_PURCHASE_DAYS) { action = "OBSERVAR"; criterion = "Compra reciente"; rank = 4; }
-        else if (coverage !== null && coverage > 120) { action = "REDUCIR"; criterion = lastPurchaseAge === null ? "Inventario anterior a 2023" : "Exceso"; rank = 3; }
+        else if (coverage !== null && coverage > RULES.inventory.excessDays && lastPurchaseAge !== null && lastPurchaseAge <= RECENT_PURCHASE_DAYS) { action = "OBSERVAR"; criterion = "Compra reciente"; rank = 4; }
+        else if (coverage !== null && coverage > RULES.inventory.excessDays) { action = "REDUCIR"; criterion = lastPurchaseAge === null ? "Inventario anterior a 2023" : "Exceso"; rank = 3; }
         else if (monthlyDemand <= 0) { action = "OBSERVAR"; criterion = "Sin demanda estimada"; rank = 5; }
         const rankedSkus = [...rows].sort((a, b) => b.sales3 - a.sales3 || ((b.price > 0 ? (b.price - b.cost) / b.price : 0) - (a.price > 0 ? (a.price - a.cost) / a.price : 0)) || a.cost - b.cost);
         return { measure: measure.measure, tier, rows, skuCount: rows.length, exist, reserved, sales6, monthlyDemand, coverage, purchase, capital: rows.reduce((sum, row) => sum + row.exist * row.cost, 0), action, criterion, rank, primary: rankedSkus[0]?.sku || "Seleccionar SKU", alternatives: rankedSkus.slice(1, 3).map((row) => row.sku) };

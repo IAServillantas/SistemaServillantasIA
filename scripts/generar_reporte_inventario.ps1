@@ -2,18 +2,18 @@ param(
     [string]$InventarioPath = ".\Inventarios al 20 de agosto.xlsx",
     [string]$VentasPath = ".\Ventas por articulo al 2026.xlsx",
     [string]$OutputDirectory = ".\resultados",
-    [int]$DiasCoberturaObjetivo = 90,
-    [int]$DiasColchon = 15
+    [int]$DiasCoberturaObjetivo,
+    [int]$DiasColchon
 )
 
 $ErrorActionPreference = "Stop"
 Set-ExecutionPolicy -Scope Process Bypass -Force
 
-$module = Get-Module -ListAvailable ImportExcel | Sort-Object Version -Descending | Select-Object -First 1
-if ($null -eq $module) {
-    throw "No se encontro el modulo ImportExcel."
-}
-Import-Module $module.Path
+Import-Module (Join-Path $PSScriptRoot "Inventory.Common.psm1") -Force
+Import-InventoryExcel
+$rules = Get-InventoryRules
+if (-not $PSBoundParameters.ContainsKey("DiasCoberturaObjetivo")) { $DiasCoberturaObjetivo = $rules.inventory.targetCoverageDays }
+if (-not $PSBoundParameters.ContainsKey("DiasColchon")) { $DiasColchon = $rules.report.bufferDays }
 
 function Get-Number($value) {
     if ($null -eq $value -or $value -eq "") { return 0.0 }
@@ -101,7 +101,7 @@ foreach ($monthGroup in ($monthTotals | Group-Object Mes)) {
     $factor = if ($overallMonthAverage -gt 0) {
         (($monthGroup.Group | Measure-Object Unidades -Average).Average / $overallMonthAverage)
     } else { 1.0 }
-    $seasonFactors[[int]$monthGroup.Name] = [math]::Min(1.25, [math]::Max(0.75, $factor))
+    $seasonFactors[[int]$monthGroup.Name] = [math]::Min($rules.report.seasonFactorMax, [math]::Max($rules.report.seasonFactorMin, $factor))
 }
 $forecastDays = $DiasCoberturaObjetivo + $DiasColchon
 $forecastSeasonFactor = Get-ForecastSeasonFactor $referenceDate $forecastDays $seasonFactors
@@ -118,7 +118,8 @@ foreach ($item in $inventory) {
     if ([string]::IsNullOrWhiteSpace($measure) -or $tier -lt 1 -or $tier -gt 4) { continue }
 
     $branchStockTotal = (Get-Number $item.SAT) + (Get-Number $item.INS) + (Get-Number $item.CUE) + (Get-Number $item.TOR)
-    if ([math]::Abs($branchStockTotal - (Get-Number $item.EXIST)) -gt 0.01) { continue }
+    # Positive differences are reserved stock; negative differences are diagnostic only.
+    $stockContract = Get-InventoryStock -SystemStock (Get-Number $item.EXIST) -Warehouses @($branchStockTotal)
 
     $skuSales = if ($salesBySku.ContainsKey($sku)) { @($salesBySku[$sku]) } else { @() }
     $recentSales = @($skuSales | Where-Object { $_.Fecha -ge $start180 -and $_.Fecha -le $referenceDate })
@@ -135,7 +136,7 @@ foreach ($item in $inventory) {
     $stockIns = Get-Number $item.INS
     $stockCue = Get-Number $item.CUE
     $stockTor = Get-Number $item.TOR
-    $stock = $stockSat + $stockIns + $stockCue + $stockTor
+    $stock = $stockContract.availableStock
     $target = $dailyDemand * $forecastDays * $forecastSeasonFactor
     $purchase = [math]::Max(0, [math]::Ceiling($target - $stock))
     $coverage = if ($dailyDemand -gt 0) { $stock / $dailyDemand } elseif ($stock -gt 0) { 9999 } else { 0 }
@@ -166,20 +167,20 @@ foreach ($item in $inventory) {
         MargenEstimado = [math]::Round($margin, 4)
         CompraSugerida = [int]$purchase
         InversionSugerida = [math]::Round($purchase * $cost, 2)
-        AdvertenciaDemanda = if ($stock -le 0 -and $daysWithoutSale -ge 60) { "Posiblemente subestimada: agotado o sin venta por 60 dias o mas" } else { "Sin alerta" }
+        AdvertenciaDemanda = if ($stock -le 0 -and $daysWithoutSale -ge $rules.report.lostDemandWarningDays) { "Posiblemente subestimada: agotado o sin venta por $($rules.report.lostDemandWarningDays) dias o mas" } else { "Sin alerta" }
     })
 }
 
 $purchases = @($analysis | Where-Object { $_.CompraSugerida -gt 0 } | Sort-Object InversionSugerida -Descending)
-$noMovement = @($analysis | Where-Object { $_.InventarioTotal -gt 0 -and $_.DiasSinVenta -ge 90 } | Sort-Object InventarioTotal -Descending)
-$excess = @($analysis | Where-Object { $_.InventarioTotal -gt 0 -and (($_.DiasCobertura -is [double]) -or ($_.DiasCobertura -is [int])) -and [double]$_.DiasCobertura -gt 120 } | Sort-Object {[double]$_.DiasCobertura} -Descending)
+$noMovement = @($analysis | Where-Object { $_.InventarioTotal -gt 0 -and $_.DiasSinVenta -ge $rules.inventory.noMovementDays } | Sort-Object InventarioTotal -Descending)
+$excess = @($analysis | Where-Object { $_.InventarioTotal -gt 0 -and (($_.DiasCobertura -is [double]) -or ($_.DiasCobertura -is [int])) -and [double]$_.DiasCobertura -gt $rules.inventory.excessDays } | Sort-Object {[double]$_.DiasCobertura} -Descending)
 $stockouts = @($analysis | Where-Object { $_.InventarioTotal -le 0 -and $_.DemandaMensualPonderada -gt 0 } | Sort-Object DemandaMensualPonderada -Descending)
 
 $branchCodes = @("SAT", "INS", "CUE", "TOR")
-$branchCapacity = @{ SAT = 1000; INS = $null; CUE = 300; TOR = 300 }
+$branchCapacity = $rules.general.capacity
 $branchSummary = foreach ($branch in $branchCodes) {
     $stock = ($analysis | Measure-Object -Property $branch -Sum).Sum
-    $limit = $branchCapacity[$branch]
+    $limit = $branchCapacity.$branch
     [pscustomobject]@{
         Sucursal = $branch
         InventarioLlantas = [int]$stock
@@ -216,7 +217,7 @@ foreach ($row in $analysis) {
                     Origen = $best.Origin
                     Destino = $destination
                     TransferenciaSugerida = [int]$quantity
-                    Evidencia = "Destino sin inventario y con ventas en los ultimos 90 dias"
+                    Evidencia = "Destino sin inventario y con ventas en los ultimos $(($referenceDate - $start90).Days + 1) dias"
                     Confianza = "Media; validar pedidos en transito y costo de traslado"
                 })
             }
@@ -224,14 +225,17 @@ foreach ($row in $analysis) {
     }
 }
 
-$inventoryExistMismatch = @($inventory | Where-Object {
-    [math]::Abs(((Get-Number $_.SAT) + (Get-Number $_.INS) + (Get-Number $_.CUE) + (Get-Number $_.TOR)) - (Get-Number $_.EXIST)) -gt 0.01
-}).Count
+$stockContracts = @($inventory | ForEach-Object {
+    Get-InventoryStock -SystemStock (Get-Number $_.EXIST) -Warehouses @((Get-Number $_.SAT), (Get-Number $_.INS), (Get-Number $_.CUE), (Get-Number $_.TOR))
+})
+$inventoryReserved = @($stockContracts | Where-Object { $_.reservedStock -gt 0 }).Count
+$inventoryNegativeDifference = @($stockContracts | Where-Object { $_.stockDiagnostics -contains "SYSTEM_STOCK_BELOW_AVAILABLE" }).Count
 $quality = @(
     [pscustomobject]@{ Validacion = "Filas de inventario"; Resultado = $inventory.Count; Estado = "Informativo"; Accion = "Ninguna" }
     [pscustomobject]@{ Validacion = "Ventas de producto validas"; Resultado = $salesClean.Count; Estado = "Informativo"; Accion = "Ninguna" }
     [pscustomobject]@{ Validacion = "SKU vacio en inventario"; Resultado = @($inventory | Where-Object { [string]::IsNullOrWhiteSpace([string]$_.CVE_ART) }).Count; Estado = "Revisar si es mayor que cero"; Accion = "Corregir catalogo" }
-    [pscustomobject]@{ Validacion = "Existencia total distinta a suma de sucursales"; Resultado = $inventoryExistMismatch; Estado = "Revisar si es mayor que cero"; Accion = "Conciliar con ERP" }
+    [pscustomobject]@{ Validacion = "Inventario apartado/no disponible"; Resultado = $inventoryReserved; Estado = "Informativo"; Accion = "No incluir apartados en disponibilidad" }
+    [pscustomobject]@{ Validacion = "EXIST menor que suma de almacenes"; Resultado = $inventoryNegativeDifference; Estado = "Diagnostico; sin exclusion automatica"; Accion = "Revisar diferencia; conservar articulo" }
     [pscustomobject]@{ Validacion = "Llanta sin medida"; Resultado = @($inventory | Where-Object { $_.CTRL_ALM -eq "PLT" -and [string]::IsNullOrWhiteSpace([string]$_.MEDIDA) }).Count; Estado = "Revisar si es mayor que cero"; Accion = "Completar catalogo" }
     [pscustomobject]@{ Validacion = "Llanta sin tier valido"; Resultado = @($inventory | Where-Object { $_.CTRL_ALM -eq "PLT" -and ((Get-Number $_.TIER) -lt 1 -or (Get-Number $_.TIER) -gt 4) }).Count; Estado = "Revisar si es mayor que cero"; Accion = "Completar catalogo" }
 )
@@ -239,23 +243,23 @@ $quality = @(
 $summary = @(
     [pscustomobject]@{ Indicador = "Fecha de corte detectada"; Valor = $referenceDate.ToString("dd/MM/yyyy"); Interpretacion = "Fecha maxima en ventas por articulo" }
     [pscustomobject]@{ Indicador = "SKU de llantas analizados"; Valor = $analysis.Count; Interpretacion = "Catalogo con medida y tier valido" }
-    [pscustomobject]@{ Indicador = "SKU con compra sugerida"; Valor = $purchases.Count; Interpretacion = "Objetivo de $forecastDays dias ajustado por temporada" }
+    [pscustomobject]@{ Indicador = "SKU con compra sugerida"; Valor = $purchases.Count; Interpretacion = "Objetivo de $forecastDays dias ($DiasCoberturaObjetivo dias de cobertura + $DiasColchon dias de colchon) ajustado por temporada" }
     [pscustomobject]@{ Indicador = "Inversion total sugerida"; Valor = "{0:C0}" -f (($purchases | Measure-Object InversionSugerida -Sum).Sum); Interpretacion = "Validar disponibilidad y tiempo de entrega" }
-    [pscustomobject]@{ Indicador = "SKU sin movimiento"; Valor = $noMovement.Count; Interpretacion = "Con inventario y 90 dias o mas sin venta" }
-    [pscustomobject]@{ Indicador = "SKU con exceso"; Valor = $excess.Count; Interpretacion = "Mas de 120 dias de cobertura" }
+    [pscustomobject]@{ Indicador = "SKU sin movimiento"; Valor = $noMovement.Count; Interpretacion = "Con inventario y $($rules.inventory.noMovementDays) dias o mas sin venta" }
+    [pscustomobject]@{ Indicador = "SKU con exceso"; Valor = $excess.Count; Interpretacion = "Mas de $($rules.inventory.excessDays) dias de cobertura" }
     [pscustomobject]@{ Indicador = "SKU en quiebre"; Valor = $stockouts.Count; Interpretacion = "Sin inventario compartido y con demanda estimada" }
     [pscustomobject]@{ Indicador = "Transferencias candidatas"; Valor = $transfers.Count; Interpretacion = "Requieren validacion operativa" }
 )
 
 $methodology = @(
     [pscustomobject]@{ Tema = "Demanda"; Regla = "Promedio mensual ponderado de seis bloques de 30 dias; pesos 1 a 6, con mayor peso al periodo reciente." }
-    [pscustomobject]@{ Tema = "Estacionalidad"; Regla = "Indice mensual calculado con meses completos de ventas; limitado entre 0.75 y 1.25 para evitar distorsiones." }
-    [pscustomobject]@{ Tema = "Compra sugerida"; Regla = "Demanda diaria ponderada por 90 dias, ajustada por temporada, menos inventario compartido." }
-    [pscustomobject]@{ Tema = "Exceso"; Regla = "Inventario superior a 120 dias de demanda estimada." }
-    [pscustomobject]@{ Tema = "Sin movimiento"; Regla = "Inventario positivo y 90 dias o mas sin venta registrada." }
+    [pscustomobject]@{ Tema = "Estacionalidad"; Regla = "Indice mensual calculado con meses completos de ventas; limitado entre $($rules.report.seasonFactorMin.ToString([Globalization.CultureInfo]::InvariantCulture)) y $($rules.report.seasonFactorMax.ToString([Globalization.CultureInfo]::InvariantCulture)) para evitar distorsiones." }
+    [pscustomobject]@{ Tema = "Compra sugerida"; Regla = "Demanda diaria ponderada por $forecastDays dias ($DiasCoberturaObjetivo dias de cobertura + $DiasColchon dias de colchon), ajustada por temporada, menos inventario compartido." }
+    [pscustomobject]@{ Tema = "Exceso"; Regla = "Inventario superior a $($rules.inventory.excessDays) dias de demanda estimada." }
+    [pscustomobject]@{ Tema = "Sin movimiento"; Regla = "Inventario positivo y $($rules.inventory.noMovementDays) dias o mas sin venta registrada." }
     [pscustomobject]@{ Tema = "Quiebre"; Regla = "Inventario compartido igual a cero y demanda ponderada mayor que cero." }
     [pscustomobject]@{ Tema = "Limitacion"; Regla = "No se recibieron pedidos en transito, historial diario de existencias, tiempos de entrega por SKU ni costos de traslado; validar antes de ejecutar compras o transferencias." }
-    [pscustomobject]@{ Tema = "Agotados por 60 dias"; Regla = "Sin historial diario de existencias no es posible reconstruir la demanda perdida; estos casos se marcan como posiblemente subestimados." }
+    [pscustomobject]@{ Tema = "Agotados por $($rules.report.lostDemandWarningDays) dias"; Regla = "Sin historial diario de existencias no es posible reconstruir la demanda perdida; estos casos se marcan como posiblemente subestimados." }
     [pscustomobject]@{ Tema = "Privacidad"; Regla = "No se utilizaron ni exportaron nombres de clientes." }
 )
 

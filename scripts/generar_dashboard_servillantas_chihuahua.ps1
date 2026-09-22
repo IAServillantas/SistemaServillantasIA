@@ -6,14 +6,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-ExecutionPolicy -Scope Process Bypass -Force
-$module = Get-Module -ListAvailable ImportExcel | Sort-Object Version -Descending | Select-Object -First 1
-if ($null -eq $module) {
-    $fallback = "C:\Users\Luis T. Acosta\OneDrive\Documentos\WindowsPowerShell\Modules\ImportExcel\7.8.10\ImportExcel.psd1"
-    if (-not (Test-Path -LiteralPath $fallback)) { throw "No se encontro el modulo ImportExcel." }
-    Import-Module $fallback
-} else {
-    Import-Module $module.Path
-}
+Import-Module (Join-Path $PSScriptRoot "Inventory.Common.psm1") -Force
+Import-InventoryExcel
+$rules = Get-InventoryRules
 
 function Number($value) {
     if ($null -eq $value -or $value -eq "") { return 0.0 }
@@ -47,13 +42,19 @@ $output = foreach ($row in $pltRows) {
     $par = Number $row.PAR
     $camp = Number $row.CAMP
     $chih = $fco + $pis + $juv + $camp
-    $exist = $chih + $par
+    $stockContract = Get-InventoryStock -SystemStock (Number $row.EXIST) -Warehouses @($fco, $pis, $juv, $par, $camp)
+    $exist = $stockContract.availableStock
     $sales3 = Number $row.ACUM_VTS_3M
     $sales3Par = [math]::Max(0, (Number $row.ACUM_VTS_PAR))
     $sales3Chih = [math]::Max(0, $sales3 - $sales3Par)
     $lastPurchase = Excel-Date $row.FCH_ULTCOM
     $lastSale = Excel-Date $row.FCH_ULTVTA
     [ordered]@{
+        systemStock = $stockContract.systemStock
+        availableStock = $stockContract.availableStock
+        reservedStock = $stockContract.reservedStock
+        stockDifference = $stockContract.stockDifference
+        stockDiagnostics = @($stockContract.stockDiagnostics)
         sku = $sku
         description = [string]$row.DESCRIPCION
         line = [string]$row.LIN_PROD
@@ -69,7 +70,7 @@ $output = foreach ($row in $pltRows) {
         camp = [int]$camp
         chih = [int]$chih
         exist = [int]$exist
-        reserved = [int][math]::Max(0, (Number $row.EXIST) - $exist)
+        reserved = [int]$stockContract.reservedStock
         cost = [math]::Round((Number $row.ULT_COSTO), 2)
         price = [math]::Round((Number $row.'Precio público'), 2)
         sales3 = [math]::Round($sales3, 2)
