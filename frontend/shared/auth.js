@@ -2,7 +2,7 @@
   'use strict';
 
   const ROLE_PAGES = Object.freeze({
-    super_admin: ['/', '/inventario/', '/criticas/', '/chihuahua/', '/cuenta/'],
+    super_admin: ['/', '/inventario/', '/criticas/', '/chihuahua/', '/cuenta/', '/admin/'],
     juarez: ['/', '/inventario/', '/criticas/', '/cuenta/'],
     chihuahua: ['/', '/chihuahua/', '/cuenta/']
   });

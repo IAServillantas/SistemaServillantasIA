@@ -61,4 +61,12 @@ function assertSiteAccess(profile, site) {
   }
 }
 
-module.exports = { bearerToken, requireUser, assertSiteAccess };
+function assertSuperAdmin(profile) {
+  if (profile.role !== 'super_admin') {
+    const error = new Error('Solo super administrador');
+    error.status = 403;
+    throw error;
+  }
+}
+
+module.exports = { bearerToken, requireUser, assertSiteAccess, assertSuperAdmin };

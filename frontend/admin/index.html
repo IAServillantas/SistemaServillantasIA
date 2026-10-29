@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin usuarios | Servillantas</title>
+  <style>
+    :root { color-scheme: light; font-family: "Segoe UI", system-ui, sans-serif; }
+    body { margin: 0; background: #f3f5f7; color: #1a2330; }
+    main { width: min(52rem, calc(100% - 2rem)); margin: 1.5rem auto 2.5rem; }
+    .top { display: flex; justify-content: space-between; gap: 1rem; align-items: start; margin-bottom: 1rem; }
+    h1 { margin: 0 0 .25rem; font-size: 1.4rem; }
+    p { margin: 0; color: #5b6775; }
+    button, .btn { border: 1px solid #d7dee7; background: #fff; border-radius: .45rem; padding: .45rem .7rem; cursor: pointer; font: inherit; }
+    button.primary { background: #1a2330; color: #fff; border-color: #1a2330; }
+    button:disabled { opacity: .55; cursor: wait; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d7dee7; border-radius: .5rem; overflow: hidden; }
+    th, td { padding: .7rem .75rem; border-bottom: 1px solid #e8edf2; text-align: left; font-size: .92rem; vertical-align: top; }
+    th { background: #f8fafc; color: #5b6775; font-weight: 600; }
+    .muted { color: #5b6775; font-size: .85rem; }
+    .ok { color: #0f7a3a; }
+    .err { color: #9b1c1c; }
+    .actions { display: flex; gap: .4rem; flex-wrap: wrap; }
+    input[type="password"], input[type="text"] { width: 100%; box-sizing: border-box; padding: .45rem .55rem; border: 1px solid #d7dee7; border-radius: .4rem; font: inherit; }
+    .panel { margin-top: 1rem; padding: .9rem 1rem; background: #fff; border: 1px solid #d7dee7; border-radius: .5rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <div>
+        <h1>Administracion de usuarios</h1>
+        <p>Reseteo temporal de contrasenas (solo super administrador)</p>
+      </div>
+      <div class="actions">
+        <button type="button" id="homeBtn">Inicio</button>
+        <button type="button" id="logoutBtn">Salir</button>
+      </div>
+    </div>
+    <p id="status" class="muted">Cargando...</p>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Nueva contrasena</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
+    <p id="result" class="muted" style="margin-top:1rem"></p>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../shared/supabase-config.js"></script>
+  <script src="../shared/auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -38,6 +38,7 @@
     <a id="linkInventario" class="card" href="inventario/" hidden>Inventario general<small>Juarez · SAT · INS · CUE · TOR</small></a>
     <a id="linkChihuahua" class="card" href="chihuahua/" hidden>Chihuahua<small>PLT · CVT · proveedores</small></a>
     <a id="linkCriticas" class="card" href="criticas/" hidden>Criticas sin existencia<small>Vista prioritaria Juarez</small></a>
+    <a id="linkAdmin" class="card" href="admin/" hidden>Admin usuarios<small>Resetear contrasenas</small></a>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="shared/supabase-config.js"></script>
@@ -53,6 +54,7 @@
       document.getElementById('linkInventario').hidden = !Auth.canOpen(profile.role, '/inventario/');
       document.getElementById('linkChihuahua').hidden = !Auth.canOpen(profile.role, '/chihuahua/');
       document.getElementById('linkCriticas').hidden = !Auth.canOpen(profile.role, '/criticas/');
+      document.getElementById('linkAdmin').hidden = profile.role !== 'super_admin';
       document.getElementById('accountBtn').onclick = () => { location.href = '/cuenta/'; };
       document.getElementById('logoutBtn').onclick = () => Auth.signOut();
     })();
