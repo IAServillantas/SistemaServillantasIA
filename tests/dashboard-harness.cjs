@@ -36,6 +36,12 @@ function dashboard(folder, options = {}) {
   };
   const context = vm.createContext({console, Date, Intl, Blob, URL, alert(){}, document:{getElementById:get,createElement:()=>({click(){}})}, localStorage:{getItem:()=> options.stored ? JSON.stringify(options.stored) : null,setItem(){},removeItem(){}}});
   context.window = context;
+  context.Auth = {
+    requireAuth: async () => ({ profile: { role: 'super_admin' }, session: { access_token: 'test' } }),
+    signOut: async () => {},
+    getSession: async () => ({ access_token: 'test' }),
+    canOpen: () => true
+  };
   for (const file of ['frontend/shared/inventory-config.js','frontend/shared/inventory.js']) {
     if (fs.existsSync(path.join(root,file))) vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context);
   }
