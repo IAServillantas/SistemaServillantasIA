@@ -1,3 +1,10 @@
+# Secretos y entorno
+.env
+.env.local
+.env.*.local
+node_modules/
+.vercel
+
 # Exportaciones empresariales y entregables derivados
 *.xlsx
 *.xls
@@ -5,14 +12,14 @@
 resultados/
 
 # Datos de inventario generados para el dashboard
-dashboard/data.js
+frontend/**/data.js
 
 # Evidencias visuales que pueden mostrar datos operativos
-dashboard/verificacion*.png
-distribucion/verificacion*.png
+**/verificacion*.png
+backend/distribucion/verificacion*.png
 
 # Paquetes de distribucion generados (se reconstruyen desde el codigo fuente)
-distribucion/*.zip
+backend/distribucion/*.zip
 
 # Instrucciones operativas internas
 AGENTS.md
@@ -25,11 +32,9 @@ Thumbs.db
 *.log
 *.tmp
 
-
 # Perfiles temporales de navegador
 .chrome-debug*/
 .edge-test/
-GIT/
 GIT/
 
 # Respaldos locales
@@ -40,4 +45,3 @@ archive/
 
 # Evidencias y diagnosticos
 **/diagnostico_*.png
-**/verificacion*.png

@@ -1,7 +1,9 @@
 param([switch]$Contract)
 $ErrorActionPreference = 'Stop'
 Import-Module ImportExcel
-$repo = Split-Path $PSScriptRoot -Parent
+$repoRoot = Split-Path $PSScriptRoot -Parent
+$repo = $repoRoot
+$scriptDir = Join-Path $repoRoot 'backend/scripts'
 $work = Join-Path ([IO.Path]::GetTempPath()) ('inventory-tests-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work | Out-Null
 if (-not $Contract) {
@@ -9,11 +11,12 @@ if (-not $Contract) {
     $baselineRoot = Join-Path $work 'baseline'
     New-Item -ItemType Directory -Path (Join-Path $baselineRoot 'scripts') | Out-Null
     foreach ($name in @('generar_dashboard_inventario','generar_dashboard_servillantas_chihuahua','generar_reporte_inventario')) {
-        $content = git -C $repo show "b83e6f3:scripts/$name.ps1"
+        $content = git -C $repoRoot show "b83e6f3:scripts/$name.ps1"
         if ($LASTEXITCODE -ne 0) { throw 'No se pudo leer la referencia de caracterizacion b83e6f3.' }
         [IO.File]::WriteAllText((Join-Path $baselineRoot "scripts/$name.ps1"), ($content -join "`n"), [Text.UTF8Encoding]::new($false))
     }
     $repo = $baselineRoot
+    $scriptDir = Join-Path $baselineRoot 'scripts'
 }
 function Assert-Equal($actual, $expected, $name) {
     if ($actual -ne $expected) { throw "$name : expected $expected, got $actual" }
@@ -34,8 +37,8 @@ $sales | Export-Excel -Path $sp -WorksheetName PRODUCTOS
 # Use a temporary working directory: no generated data or reports in the repository.
 Push-Location $work
 try {
-    & (Join-Path $repo 'scripts/generar_dashboard_inventario.ps1') -InventoryPath $ip -OutputPath 'general.js' | Out-Null
-    & (Join-Path $repo 'scripts/generar_dashboard_servillantas_chihuahua.ps1') -InventoryPath $ip -OutputPath 'chihuahua.js' | Out-Null
+    & (Join-Path $scriptDir 'generar_dashboard_inventario.ps1') -InventoryPath $ip -OutputPath 'general.js' | Out-Null
+    & (Join-Path $scriptDir 'generar_dashboard_servillantas_chihuahua.ps1') -InventoryPath $ip -OutputPath 'chihuahua.js' | Out-Null
     foreach ($name in @('general','chihuahua')) {
         $json = (Get-Content "$name.js" -Raw -Encoding UTF8) -replace '^window.INVENTORY_DATA = ', '' -replace ';\s*$', ''
         $data = $json | ConvertFrom-Json
@@ -58,7 +61,7 @@ try {
             Assert-Equal $data.rows[2].stockDiagnostics[0] 'SYSTEM_STOCK_BELOW_AVAILABLE' "$name negative diagnostic"
         }
     }
-    $report = & (Join-Path $repo 'scripts/generar_reporte_inventario.ps1') -InventarioPath $ip -VentasPath $sp -OutputDirectory (Join-Path $work 'output')
+    $report = & (Join-Path $scriptDir 'generar_reporte_inventario.ps1') -InventarioPath $ip -VentasPath $sp -OutputDirectory (Join-Path $work 'output')
     $summary = @(Import-Excel -Path $report -WorksheetName Resumen)
     $expectedCount = if ($Contract) { 3 } else { 1 }
     Assert-Equal ($summary | Where-Object Indicador -eq 'SKU de llantas analizados').Valor $expectedCount 'Report included rows (intentional EXIST change)'
@@ -74,7 +77,7 @@ try {
         Assert-Equal ($quality | Where-Object Validacion -eq 'EXIST menor que suma de almacenes').Resultado 1 'Negative difference diagnostic'
         Assert-Equal ($purchases | Where-Object SKU -eq 'RESERVED').CompraSugerida 87 'Reserved stock not subtracted twice'
         Assert-Equal ($purchases | Where-Object SKU -eq 'NEGATIVE').CompraSugerida 87 'Negative difference remains in report'
-        Import-Module (Join-Path $repo 'scripts/Inventory.Common.psm1') -Force
+        Import-Module (Join-Path $scriptDir 'Inventory.Common.psm1') -Force
         $fixtures = Get-Content (Join-Path $PSScriptRoot 'fixtures/inventory-cases.json') -Raw | ConvertFrom-Json
         foreach ($case in $fixtures.stock) {
             $result = Get-InventoryStock -SystemStock $case.systemStock -Warehouses $case.warehouses

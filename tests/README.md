@@ -20,11 +20,11 @@ Los Excel sinteticos y resultados se crean en una carpeta temporal unica que se 
 
 ## Configuracion y distribucion
 
-Editar solo `config/inventory-rules.json`. No mantener valores manualmente en los JS generados.
+Editar solo `backend/config/inventory-rules.json`. No mantener valores manualmente en los JS generados.
 
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generar_configuracion_browser.ps1`: genera `shared/inventory-config.js` de manera determinista.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File backend/scripts/generar_configuracion_browser.ps1`: genera `frontend/shared/inventory-config.js` de manera determinista.
 - El mismo comando con `-Check` falla si el artefacto esta desactualizado.
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generar_distribucion.ps1`: regenera primero la configuracion y despues ambos paquetes desde fuentes; adapta referencias a shared y genera datos vacios. Conserva lanzadores e instrucciones existentes. No copiar datos operativos a estos paquetes.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File backend/scripts/generar_distribucion.ps1`: regenera primero la configuracion y despues ambos paquetes en `backend/distribucion/` desde `frontend/`; adapta referencias a shared/vendor y genera datos vacios. Conserva lanzadores e instrucciones existentes. No copiar datos operativos a estos paquetes.
 - El mismo comando con `-Check` verifica los artefactos sin escribir.
 - `node tests/Test-Packaging.cjs`: comprueba referencias de scripts, arranque de los paquetes y ausencia de cambios estructurales en las pantallas.
 

@@ -1,0 +1,19 @@
+{
+  "name": "iaservillantas",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Monorepo inventario Servillantas (frontend estatico + API Vercel + Supabase)",
+  "scripts": {
+    "test": "node tests/Test-Inventory-Contract.cjs && node tests/Test-Dashboards.cjs && node tests/Test-Packaging.cjs",
+    "serve": "npx --yes serve frontend -p 8000",
+    "sync:config": "node scripts/sync-frontend-config.mjs",
+    "db:migrate": "node scripts/apply-migration.mjs",
+    "check:supabase": "node scripts/check-supabase.mjs"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.78.0"
+  }
+}

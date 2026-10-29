@@ -1,0 +1,12 @@
+.git
+tests
+backend/distribucion
+backend/scripts
+*.xlsx
+*.xls
+*.csv
+resultados
+archive
+AGENTS.md
+.env
+.env.local

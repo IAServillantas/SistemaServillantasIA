@@ -6,7 +6,8 @@ const path = require('node:path');
 const {dashboard,raw,root} = require('./dashboard-harness.cjs');
 const cases = require('./fixtures/inventory-cases.json');
 const file={name:'synthetic.xlsx',lastModified:Date.parse('2026-08-20')};
-for(const folder of ['dashboard','dashboard_criticas_sin_existencia','dashboard_servillantas_chihuahua']) {
+const pages = ['inventario','criticas','chihuahua'];
+for(const folder of pages) {
   for(const c of cases.stock) test(`${folder}: contract ${c.name}`,()=>{
     const {api}=dashboard(folder);
     const row=api.transformExcelRows([raw({SAT:10,INS:8,FCO:10,PIS:8,EXIST:c.systemStock})],file).rows[0];
@@ -26,14 +27,14 @@ for(const folder of ['dashboard','dashboard_criticas_sin_existencia','dashboard_
     assert.ok(row.stockDiagnostics.includes('LEGACY_SYSTEM_STOCK_UNKNOWN'));
   });
 }
- test('generated browser config equals the only editable configuration',()=>{
-  const {context}=dashboard('dashboard');
-  assert.deepEqual(JSON.parse(JSON.stringify(context.INVENTORY_RULES)),JSON.parse(fs.readFileSync(path.join(root,'config/inventory-rules.json'),'utf8')));
+test('generated browser config equals the only editable configuration',()=>{
+  const {context}=dashboard('inventario');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.INVENTORY_RULES)),JSON.parse(fs.readFileSync(path.join(root,'backend/config/inventory-rules.json'),'utf8')));
 });
 test('dashboard reads configured excess threshold',()=>{
-  const rules=JSON.parse(fs.readFileSync(path.join(root,'config/inventory-rules.json'),'utf8'));
+  const rules=JSON.parse(fs.readFileSync(path.join(root,'backend/config/inventory-rules.json'),'utf8'));
   rules.inventory.excessDays=160;
-  const {api}=dashboard('dashboard',{rules});
+  const {api}=dashboard('inventario',{rules});
   const row=api.transformExcelRows([raw({SAT:50,EXIST:50})],file).rows[0];
   assert.equal(api.evaluate(row,'TOTAL').criterion,'Sin alerta');
 });

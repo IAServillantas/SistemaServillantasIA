@@ -2,12 +2,12 @@
 $ErrorActionPreference = 'Stop'
 Import-Module ImportExcel
 $repo = Split-Path $PSScriptRoot -Parent
-$configPath = Join-Path $repo 'config/inventory-rules.json'
+$configPath = Join-Path $repo 'backend/config/inventory-rules.json'
 $originalHash = (Get-FileHash $configPath).Hash
 $work = Join-Path ([IO.Path]::GetTempPath()) ('report-text-tests-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path "$work/scripts","$work/config" -Force | Out-Null
 foreach ($name in @('generar_reporte_inventario.ps1','Inventory.Common.psm1')) {
-    Copy-Item -LiteralPath (Join-Path $repo "scripts/$name") -Destination "$work/scripts/$name"
+    Copy-Item -LiteralPath (Join-Path $repo "backend/scripts/$name") -Destination "$work/scripts/$name"
 }
 $rules = Get-Content $configPath -Raw | ConvertFrom-Json
 $rules.inventory.targetCoverageDays = 72
