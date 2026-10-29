@@ -28,7 +28,10 @@
         <h1>Servillantas</h1>
         <p>Control de inventario</p>
       </div>
-      <button id="logoutBtn" type="button">Salir</button>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end">
+        <button id="accountBtn" type="button">Cuenta</button>
+        <button id="logoutBtn" type="button">Salir</button>
+      </div>
     </div>
     <p id="denied" class="banner" hidden>No tienes permiso para esa seccion.</p>
     <p id="userMeta" class="meta">Verificando sesion...</p>
@@ -50,6 +53,7 @@
       document.getElementById('linkInventario').hidden = !Auth.canOpen(profile.role, '/inventario/');
       document.getElementById('linkChihuahua').hidden = !Auth.canOpen(profile.role, '/chihuahua/');
       document.getElementById('linkCriticas').hidden = !Auth.canOpen(profile.role, '/criticas/');
+      document.getElementById('accountBtn').onclick = () => { location.href = '/cuenta/'; };
       document.getElementById('logoutBtn').onclick = () => Auth.signOut();
     })();
   </script>

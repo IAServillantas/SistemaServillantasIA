@@ -2,9 +2,9 @@
   'use strict';
 
   const ROLE_PAGES = Object.freeze({
-    super_admin: ['/', '/inventario/', '/criticas/', '/chihuahua/'],
-    juarez: ['/', '/inventario/', '/criticas/'],
-    chihuahua: ['/', '/chihuahua/']
+    super_admin: ['/', '/inventario/', '/criticas/', '/chihuahua/', '/cuenta/'],
+    juarez: ['/', '/inventario/', '/criticas/', '/cuenta/'],
+    chihuahua: ['/', '/chihuahua/', '/cuenta/']
   });
 
   const SITE_BY_ROLE = Object.freeze({
@@ -108,6 +108,15 @@
     root.location.replace('/login/');
   }
 
+  async function updatePassword(newPassword) {
+    if (!newPassword || String(newPassword).length < 8) {
+      throw new Error('La contrasena debe tener al menos 8 caracteres.');
+    }
+    const { data, error } = await client().auth.updateUser({ password: String(newPassword) });
+    if (error) throw error;
+    return data;
+  }
+
   function accessTokenFrom(session) {
     return session?.access_token || '';
   }
@@ -121,6 +130,7 @@
     requireAuth,
     signIn,
     signOut,
+    updatePassword,
     canOpen,
     canUseSite,
     accessTokenFrom,
