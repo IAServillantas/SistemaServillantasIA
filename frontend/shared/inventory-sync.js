@@ -4,18 +4,24 @@
   const cfg = () => root.SUPABASE_CONFIG || {};
   const apiBase = () => String(cfg().apiBase || '/api').replace(/\/$/, '');
 
-  function headers(json) {
+  async function authHeader(json) {
     const h = {};
     if (json) h['Content-Type'] = 'application/json';
-    if (cfg().uploadToken) h.Authorization = `Bearer ${cfg().uploadToken}`;
+    if (root.Auth?.getSession) {
+      const session = await root.Auth.getSession();
+      if (session?.access_token) h.Authorization = `Bearer ${session.access_token}`;
+    } else if (cfg().uploadToken) {
+      h.Authorization = `Bearer ${cfg().uploadToken}`;
+    }
     return h;
   }
 
   function createClient() {
+    if (root.Auth?.client) return root.Auth.client();
     const { url, anonKey } = cfg();
     if (!url || !anonKey || !root.supabase?.createClient) return null;
     return root.supabase.createClient(url, anonKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
+      auth: { persistSession: true, autoRefreshToken: true, storage: root.localStorage }
     });
   }
 
@@ -23,13 +29,18 @@
     const siteCode = site || 'general';
     try {
       const response = await fetch(`${apiBase()}/inventory/latest?site=${encodeURIComponent(siteCode)}`, {
-        headers: headers(false)
+        headers: await authHeader(false)
       });
       if (response.ok) {
         const body = await response.json();
         return body.data || null;
       }
-    } catch (_) { /* API local ausente: fallback directo */ }
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Sesion expirada o sin permiso');
+      }
+    } catch (error) {
+      if (error.message?.includes('Sesion') || error.message?.includes('permiso')) throw error;
+    }
 
     const client = createClient();
     if (!client) return null;
@@ -64,19 +75,14 @@
       }
     };
 
-    try {
-      const response = await fetch(`${apiBase()}/inventory/save`, {
-        method: 'POST',
-        headers: headers(true),
-        body: JSON.stringify(body)
-      });
-      if (response.ok) return (await response.json()).data;
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${response.status}`);
-    } catch (error) {
-      // Sin API (solo frontend estatico): requiere service role; no se escribe desde anon.
-      throw error;
-    }
+    const response = await fetch(`${apiBase()}/inventory/save`, {
+      method: 'POST',
+      headers: await authHeader(true),
+      body: JSON.stringify(body)
+    });
+    if (response.ok) return (await response.json()).data;
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${response.status}`);
   }
 
   function isConfigured() {

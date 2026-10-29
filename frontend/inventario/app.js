@@ -409,8 +409,11 @@
   $("excelInput").addEventListener("change", (event) => { const file = event.target.files[0]; if (file) loadExcel(file); });
   $("cloudLoadButton").addEventListener("click", () => { loadFromCloud(); });
   $("restoreDataButton").addEventListener("click", () => { source = bundledSource; try { localStorage.removeItem(STORAGE_KEY); } catch (_) { } resetAllFilters(); updateSourceStatus("local"); });
+  if ($("logoutBtn")) $("logoutBtn").addEventListener("click", () => Auth.signOut());
   updateMeasureView();
   (async () => {
+    const auth = await Auth.requireAuth({ page: "/inventario/" });
+    if (!auth) return;
     updateSourceStatus();
     applyFilters();
     try {

@@ -2,15 +2,26 @@
 
 ## 1. Aplicar schema
 
-En el SQL Editor del proyecto, ejecuta el archivo:
+En el SQL Editor del proyecto, ejecuta en orden:
 
-`supabase/migrations/20261029100000_inventory_init.sql`
+1. `supabase/migrations/20261029100000_inventory_init.sql`
+2. `supabase/migrations/20261029120000_auth_profiles.sql`
 
-O con CLI (si el proyecto esta linkeado):
+## Auth / roles
+
+| Rol | Acceso |
+|-----|--------|
+| `super_admin` | Hub + inventario + criticas + Chihuahua |
+| `juarez` | Hub + inventario + criticas |
+| `chihuahua` | Hub + Chihuahua |
+
+Crear usuarios (despues de la migracion de perfiles):
 
 ```bash
-supabase db push
+npm run seed:users
 ```
+
+En Supabase → Authentication: desactiva "Confirm email" en desarrollo o deja `email_confirm: true` del seed.
 
 ## 2. Variables
 

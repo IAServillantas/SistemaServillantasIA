@@ -40,7 +40,7 @@ await check('auth health', async () => {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 });
 
-for (const table of ['inventory_rules', 'inventory_snapshots']) {
+for (const table of ['inventory_rules', 'inventory_snapshots', 'profiles']) {
   await check(`tabla ${table}`, async () => {
     const res = await fetch(`${url}/rest/v1/${table}?select=*&limit=1`, { headers });
     const text = await res.text();

@@ -4,9 +4,10 @@
   "installCommand": "npm install",
   "buildCommand": "npm run sync:config",
   "outputDirectory": "frontend",
+  "regions": ["iad1"],
   "functions": {
     "api/**/*.js": {
-      "includeFiles": "backend/lib/**",
+      "includeFiles": "backend/lib/**/*",
       "memory": 1024,
       "maxDuration": 30
     }

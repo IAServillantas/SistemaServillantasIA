@@ -2,11 +2,24 @@
 
 Root Directory: **.** (raiz del repo, no `frontend/`).
 
+## 0. Runtime Node
+
+Usar **Node.js 22.23.4** (parche de seguridad oct 2026: CVE-2026-111497 Brotli y otros).
+El repo fija `engines.node = 22.23.4` y `.nvmrc`.
+
 ## 1. Schema en Supabase (una vez)
 
-SQL Editor → pegar y Run:
+SQL Editor → Run en orden:
 
-`supabase/migrations/20261029100000_inventory_init.sql`
+1. `supabase/migrations/20261029100000_inventory_init.sql`
+2. `supabase/migrations/20261029120000_auth_profiles.sql`
+
+Luego:
+
+```bash
+npm run check:supabase
+npm run seed:users
+```
 
 Verificar:
 
